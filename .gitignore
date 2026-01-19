@@ -1,0 +1,31 @@
+# Ignore data and output folders
+data/
+*.edf
+*.set
+*.fdt
+*.bdf
+
+# Ignore Jupyter auto-generated files
+.ipynb_checkpoints/
+
+# Environments
+.env
+.venv/
+venv/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore temporary files
+*.tmp
+*.log
+*.bak
+
+__pycache__/
+*.pyc
+
+# Data (do NOT version raw NHANES data)
+data/raw/
+data/processed/
+data/interim/
