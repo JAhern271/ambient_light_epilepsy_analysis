@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ambient-light-epilepsy"
+version = "0.1.0"
+description = "Ambient light exposure analysis in epilepsy using NHANES"
+authors = [{ name = "Jake Ahern" }]
+requires-python = ">=3.9"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ambient_light_epilepsy"]
+

@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: ambient-light-epilepsy
+Version: 0.1.0
+Summary: Ambient light exposure analysis in epilepsy using NHANES
+Author: Jake Ahern
+Requires-Python: >=3.9
