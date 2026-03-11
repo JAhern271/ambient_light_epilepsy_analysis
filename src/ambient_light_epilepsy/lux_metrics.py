@@ -107,6 +107,7 @@ def time_above_threshold_normalized(df, threshold=1000):
 
 
 def relative_amplitude(df):
+
     df = df.copy()
     df = df.sort_values("timestamp")
     
@@ -126,9 +127,62 @@ def relative_amplitude(df):
     extended = np.concatenate([values, values])
     
     # Rolling means
-    m10 = np.max(pd.Series(extended).rolling(m10_window).mean())
-    l5 = np.min(pd.Series(extended).rolling(l5_window).mean())
+    m10_roll = pd.Series(extended).rolling(m10_window).mean()
+    l5_roll = pd.Series(extended).rolling(l5_window).mean()
+    
+    m10 = m10_roll.max()
+    l5 = l5_roll.min()
     
     ra = (m10 - l5) / (m10 + l5)
     
-    return m10, l5, ra
+    minutes_per_sample = epoch_minutes
+    
+    # =========================
+    # M10 midpoint
+    # =========================
+    
+    m10_idx = m10_roll.idxmax()
+    
+    m10_start = m10_idx - m10_window + 1
+    m10_midpoint_idx = m10_start + m10_window // 2
+    
+    m10_midpoint_idx = m10_midpoint_idx % len(values)
+    
+    m10_midpoint_minutes = m10_midpoint_idx * minutes_per_sample
+    
+    m10_hours = int(m10_midpoint_minutes // 60)
+    m10_minutes = int(m10_midpoint_minutes % 60)
+    
+    m10_midpoint_time = pd.Timestamp(
+        f"{m10_hours:02d}:{m10_minutes:02d}"
+    ).time()
+    
+    # =========================
+    # L5 midpoint
+    # =========================
+    
+    l5_idx = l5_roll.idxmin()
+    
+    l5_start = l5_idx - l5_window + 1
+    l5_midpoint_idx = l5_start + l5_window // 2
+    
+    l5_midpoint_idx = l5_midpoint_idx % len(values)
+    
+    l5_midpoint_minutes = l5_midpoint_idx * minutes_per_sample
+    
+    l5_hours = int(l5_midpoint_minutes // 60)
+    l5_minutes = int(l5_midpoint_minutes % 60)
+    
+    l5_midpoint_time = pd.Timestamp(
+        f"{l5_hours:02d}:{l5_minutes:02d}"
+    ).time()
+    
+    return (
+        m10,
+        l5,
+        ra,
+        m10_midpoint_minutes,
+        m10_midpoint_time,
+        l5_midpoint_minutes,
+        l5_midpoint_time
+    )
