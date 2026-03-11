@@ -93,19 +93,16 @@ def time_above_threshold_normalized(df, threshold=1000):
     # Detect sampling rate
     epoch_minutes = get_sampling_interval_minutes(df)
     
-    # Create time-of-day
-    df["time_of_day"] = df["timestamp"].dt.time
-    
-    # Average across days to get 24h profile
-    mean_24h = df.groupby("time_of_day")["mean_lux"].mean()
-    
     # Compute time above threshold
-    epochs_above = (mean_24h > threshold).sum()
+    epochs_above = (df["mean_lux"] > threshold).sum()
     
-    minutes_above = epochs_above * epoch_minutes
-    percent_of_day = minutes_above / (24 * 60)
+    # Convert to percentage of recording
+    percent_above = epochs_above / len(df)
     
-    return minutes_above, percent_of_day
+    # Convert to an average mins per day above threshold
+    mins_per_day_above = percent_above * 60 * 24
+        
+    return mins_per_day_above
 
 
 
