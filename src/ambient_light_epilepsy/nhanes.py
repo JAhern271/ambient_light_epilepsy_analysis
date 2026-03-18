@@ -8,6 +8,8 @@ Created on Mon Jan 19 13:08:20 2026
 from pathlib import Path
 import pyreadstat
 import pandas as pd
+import numpy as np
+
 
 
 
@@ -203,3 +205,124 @@ def load_dpq(year, dropna=True):
 
 
     return df
+
+
+
+
+
+def add_employment_and_depression_status(df_all):
+    # Load the OCD150 and employment status 
+    ocq_G = load_employment("G")
+    ocq_H = load_employment("H")
+    
+    # Load the depression status
+    dpq_G = load_dpq("G")
+    dpq_H = load_dpq("H")
+    
+    # Ensure SEQN types match (NHANES tables use float)
+    df_all["SEQN"] = df_all["SEQN"].astype(float)
+    
+    # Extract only the columns we need
+    ocq_G = ocq_G[["employed"]]
+    ocq_H = ocq_H[["employed"]]
+    
+    dpq_G = dpq_G[["depressed"]]
+    dpq_H = dpq_H[["depressed"]]
+    
+    # Split df_all by cohort
+    df_G = df_all[df_all["cohort"] == "G"].copy()
+    df_H = df_all[df_all["cohort"] == "H"].copy()
+    
+    # Merge employment
+    df_G = df_G.merge(ocq_G, left_on="SEQN", right_index=True, how="left")
+    df_H = df_H.merge(ocq_H, left_on="SEQN", right_index=True, how="left")
+    
+    # Merge depression
+    df_G = df_G.merge(dpq_G, left_on="SEQN", right_index=True, how="left")
+    df_H = df_H.merge(dpq_H, left_on="SEQN", right_index=True, how="left")
+    
+    # Combine cohorts back together
+    df_all = pd.concat([df_G, df_H], ignore_index=True)
+
+    return df_all
+
+
+def add_demographic_data(df_all):
+    
+    # Load demographics
+    demo_G = load_partial_demo("G")
+    demo_H = load_partial_demo("H")
+
+    demo_G = demo_G.drop("p_ed", axis=1)
+    demo_H = demo_H.drop("p_ed", axis=1)
+    
+    # Ensure SEQN type matches (NHANES index is float)
+    df_all["SEQN"] = df_all["SEQN"].astype(float)
+    
+    # Split df_all by cohort
+    df_G = df_all[df_all["cohort"] == "G"].copy()
+    df_H = df_all[df_all["cohort"] == "H"].copy()
+    
+    # Merge demographics
+    df_G = df_G.merge(demo_G, left_on="SEQN", right_index=True, how="left")
+    df_H = df_H.merge(demo_H, left_on="SEQN", right_index=True, how="left")
+    
+    # Combine back together
+    df_all = pd.concat([df_G, df_H], ignore_index=True)
+
+    # Rename 6_month to season 
+    df_all = df_all.rename(columns={'6_month': 'season'})
+
+
+    return df_all
+
+
+def add_outdoor_time(df_all):
+
+    # Load DEQ tables
+    p = Path("W:/projects/ambient_light_epilepsy_analysis/data/G/DEQ_G.parquet")
+    deq_G = pd.read_parquet(p, columns=["SEQN","DED120","DED125"])
+
+    p = Path("W:/projects/ambient_light_epilepsy_analysis/data/H/DEQ_H.parquet")
+    deq_H = pd.read_parquet(p, columns=["SEQN","DED120","DED125"])
+
+
+    # --- Clean special values ---
+    special_codes = [3333, 7777, 9999]
+
+    for df in [deq_G, deq_H]:
+        df["DED120"] = df["DED120"].replace(special_codes, np.nan)
+        df["DED125"] = df["DED125"].replace(special_codes, np.nan)
+
+        # Collapse to single metric
+        df["minutes_outdoors"] = df[["DED120","DED125"]].mean(axis=1)
+
+
+    # Ensure SEQN type matches
+    df_all["SEQN"] = df_all["SEQN"].astype(float)
+
+
+    # --- Split main dataframe by cohort ---
+    df_G = df_all[df_all["cohort"] == "G"].copy()
+    df_H = df_all[df_all["cohort"] == "H"].copy()
+
+
+    # --- Merge outdoor data ---
+    df_G = df_G.merge(
+        deq_G[["SEQN","minutes_outdoors"]],
+        on="SEQN",
+        how="left"
+    )
+
+    df_H = df_H.merge(
+        deq_H[["SEQN","minutes_outdoors"]],
+        on="SEQN",
+        how="left"
+    )
+
+
+    # --- Combine back together ---
+    df_all = pd.concat([df_G, df_H], ignore_index=True)
+
+
+    return df_all
