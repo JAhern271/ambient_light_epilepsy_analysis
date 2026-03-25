@@ -186,7 +186,7 @@ def load_employment(year, base_path):
 
 def load_dpq(year, base_path, dropna=True):
     
-    p = base_path / f"{year}" / f"dpq_{year}.parquet"
+    p = base_path / f"{year}" / f"DPQ_{year}.parquet"
     #p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/dpq_{year}.parquet")
 
     phq_cols = [
