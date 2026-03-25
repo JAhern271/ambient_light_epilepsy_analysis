@@ -90,9 +90,9 @@ def load_partial_demo(year, base_path):
     return df
 
 
-def load_PAXHD(year):
+def load_PAXHD(year, base_path):
     
-    p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/PAXHD_{year}.parquet")
+    p = base_path / f"{year}" / f"PAXHD_{year}.parquet"
     df = pd.read_parquet(p)
     df = df.set_index("SEQN")
     
@@ -167,7 +167,7 @@ def add_demo_labels(df_input):
 
 def load_employment(year, base_path):
 
-    p = base_path / f"{year}" / "OCQ_{year}.parquet"
+    p = base_path / f"{year}" / f"OCQ_{year}.parquet"
     #p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/OCQ_{year}.parquet")
 
     cols = ["SEQN", "OCD150"]
@@ -186,7 +186,7 @@ def load_employment(year, base_path):
 
 def load_dpq(year, base_path, dropna=True):
     
-    p = base_path / f"{year}" / "dpq_{year}.parquet"
+    p = base_path / f"{year}" / f"dpq_{year}.parquet"
     #p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/dpq_{year}.parquet")
 
     phq_cols = [
