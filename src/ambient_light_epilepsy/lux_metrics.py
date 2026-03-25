@@ -12,7 +12,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 
 
-def compute_lux_summary(seqn_array, year, base_path):
+def compute_lux_summary(seqn_array, year, base_path, downsample="5min"):
     """
     Computes:
         - mean lux across recording
@@ -24,7 +24,13 @@ def compute_lux_summary(seqn_array, year, base_path):
     results = []
     
     for seqn in seqn_array:
-        file_path = Path(base_path) / f"PAXLUX_{year}" / "parquet_5min" / f"SEQN_{int(seqn)}_5min.parquet"
+        
+        if downsample=="5min":
+            file_path = Path(base_path) / f"PAXLUX_{year}" / "parquet_5min" / f"SEQN_{int(seqn)}_5min.parquet"
+            
+        elif downsample==None:
+            file_path = Path(base_path) / f"PAXLUX_{year}" / "parquet" / f"SEQN_{int(seqn)}.parquet"
+            
     
         if not file_path.exists():
             print(f"ERROR: path does not exist: {file_path}")
