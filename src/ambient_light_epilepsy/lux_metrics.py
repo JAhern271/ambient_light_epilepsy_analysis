@@ -27,10 +27,11 @@ def compute_lux_summary(seqn_array, year, base_path, downsample="5min"):
         
         if downsample=="5min":
             file_path = Path(base_path) / f"PAXLUX_{year}" / "parquet_5min" / f"SEQN_{int(seqn)}_5min.parquet"
+            cols = ["timestamp", "mean_lux"]
             
         elif downsample==None:
             file_path = Path(base_path) / f"PAXLUX_{year}" / "parquet" / f"SEQN_{int(seqn)}.parquet"
-            
+            cols = ["timestamp", "LUX"]
     
         if not file_path.exists():
             print(f"ERROR: path does not exist: {file_path}")
@@ -40,7 +41,7 @@ def compute_lux_summary(seqn_array, year, base_path, downsample="5min"):
             pf = pq.ParquetFile(file_path)
     
             # Only read necessary columns
-            table = pf.read(columns=["timestamp", "mean_lux"])
+            table = pf.read(columns=cols)
             df = table.to_pandas()
     
             if df.empty:
