@@ -31,7 +31,7 @@ def compute_lux_summary(seqn_array, year, base_path, downsample="5min"):
             
         elif downsample==None:
             file_path = Path(base_path) / f"PAXLUX_{year}" / "parquet" / f"SEQN_{int(seqn)}.parquet"
-            cols = ["timestamp", "LUX"]
+            cols = ["HEADER_TIMESTAMP", "LUX"]
     
         if not file_path.exists():
             print(f"ERROR: path does not exist: {file_path}")
@@ -43,6 +43,9 @@ def compute_lux_summary(seqn_array, year, base_path, downsample="5min"):
             # Only read necessary columns
             table = pf.read(columns=cols)
             df = table.to_pandas()
+            
+            # Rename the columns
+            df.columns = ['timestamp', 'mean_lux']
     
             if df.empty:
                 print(f"ERROR: table is empty: {file_path}")
