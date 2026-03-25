@@ -10,30 +10,66 @@ import pandas as pd
 import numpy as np
 #import pyarrow.parquet as pq
 
-
-
 import ambient_light_epilepsy.nhanes as nhn
 import ambient_light_epilepsy.cohort as ch
 import ambient_light_epilepsy.lux_metrics as lm
 
 
-# Define your directory and filename for the final analysis
-dir_path = Path("C:/Users/ahernj/Documents/Projects/ambient_light_epilepsy_analysis/analysis/lux")
+import sys
+print("Python executable:", sys.executable)
+
+
+# # Define your directory and filename for the final analysis
+# dir_path = Path("C:/Users/ahernj/Documents/Projects/ambient_light_epilepsy_analysis/analysis/lux")
+# save_name = "lux_5min_fmatch_analysis.csv"
+
+
+# # Define the directory for the data
+# base_path = "W:/projects/ambient_light_epilepsy_analysis/data"
+
+
+
+
+# HPC project root
+project_root = Path("/rds/projects/t/terryjr-fellowship-ahern/projects/ambient_light_epilepsy_analysis")
+
+# Output directory
+dir_path = project_root / "analysis" / "lux"
+dir_path.mkdir(parents=True, exist_ok=True)
+
 save_name = "lux_5min_fmatch_analysis.csv"
 
+# Data directory
+base_path = project_root / "data"
 
-# Define the directory for the data
-base_path = "W:/projects/ambient_light_epilepsy_analysis/data"
+
+
+
+
+
+
 
 # Run analysis for G cohort 
 control_seqn, pwe_seqn = ch.load_freq_matched_control_groups("G")
+
+control_seqn = control_seqn[:10]
+pwe_seqn = pwe_seqn[:10]
+
 df_control_summary_G = lm.compute_lux_summary(control_seqn, "G", base_path)
 df_pwe_summary_G     = lm.compute_lux_summary(pwe_seqn, "G", base_path)
 
 # Run analysis for H cohort 
 control_seqn, pwe_seqn = ch.load_freq_matched_control_groups("H")
+
+control_seqn = control_seqn[:10]
+pwe_seqn = pwe_seqn[:10]
+
 df_control_summary_H = lm.compute_lux_summary(control_seqn, "H", base_path)
 df_pwe_summary_H     = lm.compute_lux_summary(pwe_seqn, "H", base_path)
+
+
+
+
 
 
 

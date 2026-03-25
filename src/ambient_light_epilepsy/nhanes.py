@@ -66,9 +66,10 @@ def xpt_to_parquet(
 
 
 
-def load_partial_demo(year):
+def load_partial_demo(year, base_path):
     # Load the demographics table
-    p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/DEMO_{year}.parquet")
+    p = base_path / f"{year}" / f"DEMO_{year}.parquet"
+    #p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/DEMO_{year}.parquet")
     
     cols_to_load = {"SEQN": "ID",
                     "RIDAGEYR": "age", 
@@ -164,9 +165,10 @@ def add_demo_labels(df_input):
 
 
 
-def load_employment(year):
+def load_employment(year, base_path):
 
-    p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/OCQ_{year}.parquet")
+    p = base_path / f"{year}" / "OCQ_{year}.parquet"
+    #p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/OCQ_{year}.parquet")
 
     cols = ["SEQN", "OCD150"]
 
@@ -182,9 +184,10 @@ def load_employment(year):
 
 
 
-def load_dpq(year, dropna=True):
-
-    p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/dpq_{year}.parquet")
+def load_dpq(year, base_path, dropna=True):
+    
+    p = base_path / f"{year}" / "dpq_{year}.parquet"
+    #p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/dpq_{year}.parquet")
 
     phq_cols = [
         "DPQ010","DPQ020","DPQ030",
@@ -210,14 +213,14 @@ def load_dpq(year, dropna=True):
 
 
 
-def add_employment_and_depression_status(df_all):
+def add_employment_and_depression_status(df_all, base_path):
     # Load the OCD150 and employment status 
-    ocq_G = load_employment("G")
-    ocq_H = load_employment("H")
+    ocq_G = load_employment("G", base_path)
+    ocq_H = load_employment("H", base_path)
     
     # Load the depression status
-    dpq_G = load_dpq("G")
-    dpq_H = load_dpq("H")
+    dpq_G = load_dpq("G", base_path)
+    dpq_H = load_dpq("H", base_path)
     
     # Ensure SEQN types match (NHANES tables use float)
     df_all["SEQN"] = df_all["SEQN"].astype(float)
@@ -247,11 +250,11 @@ def add_employment_and_depression_status(df_all):
     return df_all
 
 
-def add_demographic_data(df_all):
+def add_demographic_data(df_all, base_path):
     
     # Load demographics
-    demo_G = load_partial_demo("G")
-    demo_H = load_partial_demo("H")
+    demo_G = load_partial_demo("G", base_path)
+    demo_H = load_partial_demo("H", base_path)
 
     demo_G = demo_G.drop("p_ed", axis=1)
     demo_H = demo_H.drop("p_ed", axis=1)
@@ -277,13 +280,15 @@ def add_demographic_data(df_all):
     return df_all
 
 
-def add_outdoor_time(df_all):
+def add_outdoor_time(df_all, base_path):
 
     # Load DEQ tables
-    p = Path("W:/projects/ambient_light_epilepsy_analysis/data/G/DEQ_G.parquet")
+    p = base_path / "G" / "DEQ_G.parquet"
+    #p = Path("W:/projects/ambient_light_epilepsy_analysis/data/G/DEQ_G.parquet")
     deq_G = pd.read_parquet(p, columns=["SEQN","DED120","DED125"])
 
-    p = Path("W:/projects/ambient_light_epilepsy_analysis/data/H/DEQ_H.parquet")
+    p = base_path / "H" / "DEQ_H.parquet"
+    #p = Path("W:/projects/ambient_light_epilepsy_analysis/data/H/DEQ_H.parquet")
     deq_H = pd.read_parquet(p, columns=["SEQN","DED120","DED125"])
 
 

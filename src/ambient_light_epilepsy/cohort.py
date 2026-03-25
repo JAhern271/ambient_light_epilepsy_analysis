@@ -13,9 +13,10 @@ import pyarrow.parquet as pq
 
 
 
-def find_people_on_asm(year, overwrite=False):
-    
-    p = Path(f"C:/Users/ahernj/Documents/Projects/ambient_light_epilepsy_analysis/data/{year}/raw_parquet/RXQ_RX_{year}.parquet")
+def find_people_on_asm(year, base_path, overwrite=False):
+
+    p = base_path / f"{year}" / f"RXQ_RX_{year}.parquet"
+    #p = Path(f"C:/Users/ahernj/Documents/Projects/ambient_light_epilepsy_analysis/data/{year}/raw_parquet/RXQ_RX_{year}.parquet")
 
     if year == "G":
         # Load the prescription meds data
@@ -67,7 +68,7 @@ def find_people_on_asm(year, overwrite=False):
     pwe = pd.Series(asm_users, name="SEQN")
 
     # Only save and return if the file does not exist already
-    save_path = Path(f"C:/Users/ahernj/Documents/Projects/ambient_light_epilepsy_analysis/data/{year}/processed/people_with_epilepsy_{year}.csv")
+    save_path = base_path / f"{year}" / "processed" / f"people_with_epilepsy_{year}.csv"
     if save_path.exists():
 
         if overwrite==True:
@@ -85,24 +86,24 @@ def find_people_on_asm(year, overwrite=False):
 
 
 
-def load_pwe_seqn(year):
+def load_pwe_seqn(year, base_path):
     
     # Load SEQN numbers for people with epilepsy
-    pwe_path = Path(f"C:\\Users\\ahernj\\Documents\\Projects\\ambient_light_epilepsy_analysis\\data\\{year}\\processed\\people_with_epilepsy_{year}.csv")
+    pwe_path = base_path / "processed" / f"people_with_epilepsy_{year}.csv"
+    
+    #pwe_path = Path(f"C:\\Users\\ahernj\\Documents\\Projects\\ambient_light_epilepsy_analysis\\data\\{year}\\processed\\people_with_epilepsy_{year}.csv")
     
     return pd.read_csv(pwe_path, index_col=0)
     
 
 
-def load_freq_matched_control_groups(year):
+def load_freq_matched_control_groups(year, base_path):
     
-    # Load SEQN numbers the PWE and control groups
-    control_path = Path(f"C:\\Users\\ahernj\\Documents\\Projects\\ambient_light_epilepsy_analysis\\data\\{year}\\processed\\freq_match_control_{year}.csv")
-    pwe_path = Path(f"C:\\Users\\ahernj\\Documents\\Projects\\ambient_light_epilepsy_analysis\\data\\{year}\\processed\\freq_match_pwe_{year}.csv")
-
+    control_path = base_path / "processed" / f"freq_match_control_{year}.csv"
+    pwe_path     = base_path / "processed" / f"freq_match_pwe_{year}.csv"
+    
     control_s = pd.read_csv(control_path, index_col=0)
     pwe_s = pd.read_csv(pwe_path, index_col=0)
-    
     
     return control_s.values.reshape(-1).astype(int), pwe_s.values.reshape(-1).astype(int)
     
