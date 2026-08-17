@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+title: Ambient light exposure analysis in epilepsy using NHANES
+message: If you use this software, please cite it as below.
+type: software
+authors:
+  - given-names: Jake
+    family-names: Ahern
+    email: jake.ahern@plymouth.ac.uk
+    affiliation: University of Plymouth
+    # orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO
+repository-code: "https://github.com/ahernj/ambient_light_epilepsy_analysis"  # TODO: confirm
+abstract: >-
+  Analysis of ambient light exposure and nonparametric circadian rhythm metrics in
+  people with epilepsy compared with frequency-matched controls, using wrist-worn
+  light sensor and accelerometry recordings from the NHANES 2011-2012 and 2013-2014
+  cycles.
+keywords:
+  - epilepsy
+  - circadian rhythm
+  - ambient light exposure
+  - actigraphy
+  - NHANES
+version: 0.1.0
+# license: MIT  # TODO: pending confirmation of institutional IP requirements
