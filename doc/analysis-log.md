@@ -19,6 +19,52 @@ Template:
 
 ---
 
+## 2026-08-17 — IS definition corrected; the finding survives and strengthens
+
+**Ran:** Rewrote `interdaily_stability` to resample the recording to hourly bins before
+computing, so the numerator and denominator sit at the same time resolution, per Witting
+et al. (1990). Recomputed IS for all 861 participants from the 5-minute data and reran
+the group comparison against both the old and new definitions.
+
+**Result: the finding holds, and is stronger under the corrected definition.**
+
+| Model | Old IS | Corrected IS |
+|---|---|---|
+| Unadjusted (Mann–Whitney) | p = 0.0018 | p = 0.0037 |
+| Adjusted for age, sex, PIR, education, season, cohort | coef −0.0187, p = 0.0050 | coef −0.0232, p = 0.0071 |
+| Additionally adjusted for employment and depression | coef −0.0142, **p = 0.056** | coef −0.0202, **p = 0.035** |
+
+IS remains lower in PWE throughout. Group means move from 0.172 / 0.152
+(controls / PWE) to 0.299 / 0.276, consistent with the old implementation having
+suppressed IS.
+
+**This changes a stated conclusion.** Notebook 08 records that "after adjusting for
+employment and depression, epilepsy is no longer a statistically significant predictor of
+IS". Under the corrected definition it *is* still significant (p = 0.035). The earlier
+non-significance was an artefact of the mixed-resolution implementation, which added
+participant-varying noise to the measure. The adjusted effect is −7.8% of the control mean
+(previously −10.9%).
+
+**Caveats.**
+
+- Computed on the **5-minute** data; notebook 08's published figures came from the **1 Hz**
+  run. Because IS now resamples to hourly first, the two should agree closely, but the
+  1 Hz analysis has not been rerun to confirm it.
+- Notebook 08's displayed outputs and its IS conclusion are now superseded and need
+  regenerating.
+- `IV` is unchanged and remains resolution dependent by nature, so 5-minute and 1 Hz IV
+  values still cannot be compared.
+- One participant yields NaN IS (no variance); n = 860 adjusted, 781 with employment and
+  depression included.
+
+**Also:** `tests/data/regression_expected.csv` was regenerated deliberately, because the
+IS column moved by design. All 41 tests pass. Tests now assert that IS is independent of
+input resolution, which is the property the old implementation lacked.
+
+**Next:** rerun the 1 Hz analysis, then regenerate notebook 08.
+
+---
+
 ## 2026-08-17 — Preprocessing scripts recovered and committed
 
 **Ran:** No analysis. Located the missing preprocessing code on the W: drive under

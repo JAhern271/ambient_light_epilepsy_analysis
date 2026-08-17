@@ -129,8 +129,19 @@ Computed per participant by `lux_metrics.compute_lux_summary`.
 | `RA` | Relative amplitude, `(M10 - L5) / (M10 + L5)` |
 | `m10_midpoint` | Midpoint of the M10 window, minutes from midnight |
 | `l5_midpoint` | Midpoint of the L5 window, minutes from midnight |
-| `IS` | Interdaily stability, computed against hourly means |
-| `IV` | Intradaily variability, from successive-difference variance |
+| `IS` | Interdaily stability (Witting et al. 1990), computed on **hourly** bins |
+| `IV` | Intradaily variability, from successive-difference variance at the native epoch |
+
+`IS` is the variance of the average 24 h profile as a fraction of total variance, running
+from 0 (no day-to-day reproducibility) to 1 (identical days). The recording is resampled
+to hourly before computation, so the profile bins and the epochs are at the same
+resolution. This follows the usual convention in the nonparametric circadian literature
+and means the 5-minute and 1 Hz analyses give the same answer. The `bin_size` argument
+can compute at another resolution, but values are then not comparable across resolutions.
+
+`IV` is computed at whatever resolution the input arrives at, which is standard but means
+**IV from the 5-minute analysis is not comparable with IV from the 1 Hz analysis**. Higher
+sampling rates yield higher IV for the same underlying signal.
 
 M10 and L5 are computed on the average 24-hour profile with a circular extension, so
 windows crossing midnight are handled.

@@ -296,32 +296,71 @@ def relative_amplitude(df):
     )
 
 
-def interdaily_stability(df):
+def interdaily_stability(df, bin_size="1h"):
+    """
+    Interdaily stability: how reliably the same pattern repeats day to day.
 
-    df = df.copy()
-    df = df.sort_values("timestamp")
+    Witting et al. (1990):
 
-    # mean lux
-    mean_lux = df["mean_lux"].mean()
+        IS = (n * sum_h (x_h - x)^2) / (p * sum_i (x_i - x)^2)
 
-    # extract hour of day
-    df["hour"] = df["timestamp"].dt.hour
+    where x_i are the epochs, x is the grand mean, p is the number of epochs
+    per day, and x_h is the mean of time-of-day bin h across days. It is the
+    variance of the average 24 h profile as a fraction of the total variance,
+    so it runs from 0 (no day-to-day reproducibility) to 1 (identical days).
 
-    # mean lux for each hour
-    hourly_mean = df.groupby("hour")["mean_lux"].mean()
+    The two halves of that ratio must be at the SAME time resolution. An
+    earlier version of this function binned the numerator hourly while leaving
+    the denominator at the raw epoch, so the denominator carried within-hour
+    variance the numerator could not capture. That pushed IS down by a factor
+    that varied per participant, and made values from the 5 minute and 1 Hz
+    analyses incomparable with each other and with published figures.
 
-    # number of samples
-    N = len(df)
+    The recording is therefore resampled to `bin_size` before anything is
+    computed. Hourly is the default because it is the usual convention in the
+    nonparametric circadian literature, and because it makes results from
+    different source resolutions directly comparable.
 
-    # numerator
-    num = N * np.sum((hourly_mean - mean_lux) ** 2)
+    Parameters
+    ----------
+    df : pandas DataFrame
+        Must contain 'timestamp' and 'mean_lux'.
+    bin_size : str
+        Pandas offset alias for the epoch to compute at. Default '1h'.
 
-    # denominator
-    denom = 24 * np.sum((df["mean_lux"] - mean_lux) ** 2)
+    Returns
+    -------
+    float
+        IS, or NaN for a recording with no variance.
+    """
 
-    IS = num / denom
+    series = df.set_index("timestamp")["mean_lux"].sort_index()
 
-    return IS
+    # Resample so that profile bins and epochs are the same thing.
+    # Gaps resample to NaN and are dropped rather than counted as zero.
+    binned = series.resample(bin_size).mean().dropna()
+
+    if binned.empty:
+        return np.nan
+
+    bin_minutes = pd.Timedelta(bin_size).total_seconds() / 60
+    epochs_per_day = int(round(24 * 60 / bin_minutes))
+
+    values = binned.to_numpy()
+    grand_mean = values.mean()
+
+    # Average 24 h profile: mean of each time-of-day bin across days
+    minutes_into_day = binned.index.hour * 60 + binned.index.minute
+    time_of_day_bin = (minutes_into_day // bin_minutes).astype(int)
+    profile = binned.groupby(time_of_day_bin).mean().to_numpy()
+
+    numerator = len(values) * np.sum((profile - grand_mean) ** 2)
+    denominator = epochs_per_day * np.sum((values - grand_mean) ** 2)
+
+    if denominator == 0:
+        return np.nan
+
+    return numerator / denominator
 
 
 

@@ -262,29 +262,54 @@ def test_sampling_interval_is_inferred_from_the_first_two_samples_only():
 # Resolution dependence
 # ---------------------------------------------------------------------------
 
-def test_interdaily_stability_differs_between_5min_and_hourly_input(sinusoid_recording):
+def test_interdaily_stability_is_independent_of_input_resolution(sinusoid_recording):
     """
-    IS is computed with hourly bins in the numerator but raw epochs in the
-    denominator, so its value depends on the sampling resolution of the input.
+    The same underlying signal must score the same IS whether it arrives at
+    5 min or hourly resolution, because IS resamples before computing.
 
-    The same underlying signal therefore scores differently at 5 min and at
-    1 hour. This matters because the project has results computed at both 5 min
-    and 1 Hz: IS values are not comparable across them.
+    This is the property the earlier implementation lacked, and it is what
+    makes the 5 minute and 1 Hz analyses comparable with each other.
     """
     five_min = sinusoid_recording
-
     hourly = (
-        five_min.set_index("timestamp")["mean_lux"]
-        .resample("1h")
-        .mean()
-        .reset_index()
-        .rename(columns={"mean_lux": "mean_lux"})
+        five_min.set_index("timestamp")["mean_lux"].resample("1h").mean().reset_index()
     )
 
-    is_5min = lm.interdaily_stability(five_min)
-    is_hourly = lm.interdaily_stability(hourly)
+    assert lm.interdaily_stability(five_min) == pytest.approx(
+        lm.interdaily_stability(hourly), rel=1e-9
+    )
 
-    assert is_5min != pytest.approx(is_hourly, rel=1e-3)
+
+def test_interdaily_stability_is_bounded_by_zero_and_one(noisy_recording):
+    """IS is a variance ratio, so it cannot leave [0, 1]."""
+    assert 0.0 <= lm.interdaily_stability(noisy_recording) <= 1.0
+
+
+def test_interdaily_stability_respects_the_bin_size_argument(noisy_recording):
+    """
+    Computing at a finer epoch is possible and gives a lower number, because
+    noise that averages out within an hourly bin survives in a 5 minute one.
+
+    A perfectly repeating signal scores 1 at any bin size, so an irregular
+    recording is needed to show the argument has an effect at all.
+    """
+    hourly = lm.interdaily_stability(noisy_recording, bin_size="1h")
+    fine = lm.interdaily_stability(noisy_recording, bin_size="5min")
+
+    assert fine < hourly
+
+
+def test_interdaily_stability_ignores_gaps_rather_than_zero_filling(square_recording):
+    """
+    A recording with a missing stretch must not have the gap counted as dark.
+    Dropping two hours should leave IS essentially unchanged for a signal whose
+    days are otherwise identical.
+    """
+    with_gap = square_recording.drop(
+        square_recording.index[100:124]  # two hours at 5 min epochs
+    )
+
+    assert lm.interdaily_stability(with_gap) == pytest.approx(1.0, abs=0.05)
 
 
 def test_intradaily_variability_differs_between_5min_and_hourly_input(sinusoid_recording):

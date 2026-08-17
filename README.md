@@ -19,8 +19,9 @@ Comparing 192 PWE against 669 frequency-matched controls, adjusted for age, sex,
 education, season and cohort, PWE show **lower daytime light exposure** (`mean_daytime_lux`),
 **less time above 1000 lux**, **lower M10** and **lower interdaily stability**. Nighttime
 light exposure does not differ between groups. Employment and depression each explain
-part of the difference, but epilepsy remains significant for the light metrics; for
-interdaily stability it does not survive adjustment for both.
+part of the difference, but epilepsy remains significant after adjusting for both —
+including for interdaily stability (p = 0.035), which an earlier, mis-specified IS
+implementation had obscured. See [doc/analysis-log.md](doc/analysis-log.md).
 
 ## Data
 

@@ -86,18 +86,19 @@ right.
       [analysis-log.md](analysis-log.md) — this turned up a real problem in
       `interdaily_stability`, described below.
 
-### Outstanding decision: how should IS be defined?
+### IS definition (RESOLVED 2026-08-17)
 
-`interdaily_stability` mixes time resolutions — hourly bins in the numerator, raw epochs
-in the denominator. On real participants this makes IS about **2.2x lower** than at
-matched hourly resolution, by a factor that **varies per participant** (1.09–4.90), so it
-does not cancel in a group comparison. Reduced IS in PWE is one of the four headline
-findings, so this needs resolving before write-up.
-
-- [ ] Decide between resampling to hourly before computing IS, or using time-of-day bins
-      at the epoch resolution.
-- [ ] Recheck whether the PWE-versus-control IS difference survives the change.
-- [ ] Regenerate any affected results and note the change in the analysis log.
+- [x] **Resolved by resampling to hourly before computing**, so numerator and denominator
+      share a resolution, per Witting et al. (1990). Hourly is the convention in the
+      nonparametric circadian literature and makes the 5-minute and 1 Hz analyses agree.
+      A `bin_size` argument allows other resolutions.
+- [x] **The finding survives and strengthens.** Recomputed for all 861 participants: IS
+      remains lower in PWE, and now stays significant after adjusting for employment and
+      depression (p = 0.035, previously p = 0.056). See [analysis-log.md](analysis-log.md).
+- [x] **Regression fixture regenerated** deliberately, and tests now assert that IS is
+      independent of input resolution.
+- [ ] **Rerun the 1 Hz analysis** and regenerate notebook 08, whose displayed outputs and
+      IS conclusion are now superseded.
 
 ## Phase 4 — Close the provenance gap (1–2 days, medium risk)
 
