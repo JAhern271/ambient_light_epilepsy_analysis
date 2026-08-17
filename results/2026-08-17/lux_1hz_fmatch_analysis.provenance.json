@@ -1,0 +1,10 @@
+{
+  "output": "lux_1hz_fmatch_analysis.csv",
+  "rows": 861,
+  "created_utc": "2026-08-17T14:24:17+00:00",
+  "derived_from": "W: analysis/lux/lux_1hz_fmatch_analysis.csv",
+  "git_commit": "7e5a7e68cea530f2c4328526928e3bcd46559e64",
+  "note": "All columns except IS are the original 1 Hz values. IS was replaced with the corrected definition (hourly resampling, Witting et al. 1990) computed from the 5-minute recordings. Corrected IS is independent of source resolution: 1 Hz and 5-minute agree to 3e-06 (0.001%), verified on 6 participants. IV is unchanged and remains 1 Hz, so it is not comparable with 5-minute IV.",
+  "machine": "UOB241226",
+  "python": "3.10.19"
+}

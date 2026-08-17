@@ -19,6 +19,46 @@ Template:
 
 ---
 
+## 2026-08-17 — Notebook 08 regenerated against corrected IS
+
+**Ran:** Built `results/2026-08-17/lux_1hz_fmatch_analysis.csv` by replacing only the IS
+column of the 1 Hz results with the corrected values (justified by the resolution
+independence verified earlier), then re-executed notebook 08 end to end and updated its
+written conclusions to match the new output.
+
+**Result: the notebook's own models confirm the finding, using its sqrt transform and
+HC3 robust standard errors.**
+
+| Model | Old IS | Corrected IS |
+|---|---|---|
+| Unadjusted MWU | p = 0.0053 | p = 0.0037 |
+| FDR corrected | p = 0.0133 | p = 0.0092 |
+| Adjusted (sqrt, HC3) | coef −0.0196, p = 0.0112 | coef −0.0215, p = 0.0071 |
+| Baseline, depression subset | p = 0.0368 | p = 0.0119 |
+| + employment | p = 0.0581 | p = 0.0259 |
+| + depression | p = 0.0612 | p = 0.0214 |
+| **+ both** | **p = 0.0791** | **p = 0.0361** |
+
+IS is significant in every model, including the full one. The notebook's previous
+conclusion — that epilepsy stops predicting IS once employment and depression are
+adjusted for — is now corrected in the markdown.
+
+**One result moved the other way.** In the time-outdoors models, which use only the
+n = 623 participants with a reported `minutes_outdoors` (136 PWE, down from 192),
+epilepsy is *not* a significant predictor of corrected IS even at baseline
+(p = 0.105; with outdoors p = 0.179). Under the old IS these were p = 0.026 and p = 0.071.
+Given the smaller and non-randomly missing subset, this most likely reflects loss of
+power rather than absence of effect, and the notebook now says so rather than claiming
+either direction.
+
+**Unchanged:** every non-IS metric is bit-identical to the previous run, confirming the
+change was isolated to IS.
+
+**Also:** notebook title corrected from "06 - Initial LUX analysis" to "08 - LUX results",
+left over from the renumbering, and the hard-coded W: path replaced with a `paths` lookup.
+
+---
+
 ## 2026-08-17 — IS definition corrected; the finding survives and strengthens
 
 **Ran:** Rewrote `interdaily_stability` to resample the recording to hourly bins before

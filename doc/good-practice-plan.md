@@ -100,11 +100,14 @@ right.
 - [x] **Confirmed no 1 Hz metric recompute is needed.** Corrected IS computed from 1 Hz
       recordings matches the 5-minute-derived value to 3e-06 (0.001%), because IS now
       resamples to hourly first.
-- [ ] **Regenerate notebook 08**, whose displayed IS values and stated IS conclusion are
-      superseded. This is a rerun of statistics over an existing CSV, not a metric
-      recompute.
-- [ ] **Replace the stale IS column** in `lux_1hz_fmatch_analysis.csv`, or rerun
-      `scripts/lux_analysis.py --downsample 1hz` once to get a provenance-stamped file.
+- [x] **Notebook 08 regenerated** 2026-08-17. Its own models confirm IS remains significant
+      after adjusting for employment and depression (p = 0.036, previously p = 0.079), and
+      the written conclusion has been corrected. Also repointed from a hard-coded W: path
+      to a `paths` lookup, and its stale "06" title fixed.
+- [x] **Stale IS column replaced** in `results/2026-08-17/lux_1hz_fmatch_analysis.csv`,
+      with a provenance sidecar recording that only IS was substituted and why.
+- [ ] **Rerun `scripts/lux_analysis.py --downsample 1hz`** when convenient, so the 1 Hz
+      results come from a single internally consistent run rather than a patched file.
 - [ ] **Decide which resolution is reported.** `IV` legitimately differs between 5-minute
       and 1 Hz, so the two results files are not interchangeable wholesale.
 
