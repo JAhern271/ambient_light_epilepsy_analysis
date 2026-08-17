@@ -17,7 +17,6 @@ Examples
 import argparse
 import json
 import platform
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,7 +26,7 @@ import pandas as pd
 import ambient_light_epilepsy.nhanes as nhn
 import ambient_light_epilepsy.cohort as ch
 import ambient_light_epilepsy.lux_metrics as lm
-from ambient_light_epilepsy import paths
+from ambient_light_epilepsy import paths, provenance
 
 
 def parse_args():
@@ -57,21 +56,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def git_commit():
-    """Current commit hash, with a -dirty suffix if the tree has changes."""
-    try:
-        repo = paths.project_root()
-        commit = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=repo, text=True
-        ).strip()
-        changed = subprocess.check_output(
-            ["git", "status", "--porcelain"], cwd=repo, text=True
-        ).strip()
-        return commit + ("-dirty" if changed else "")
-    except (subprocess.CalledProcessError, OSError):
-        return "unknown"
-
-
 def write_provenance(save_path, args, n_rows, base_path):
     """
     Record how a results file was produced, alongside the file itself.
@@ -83,7 +67,7 @@ def write_provenance(save_path, args, n_rows, base_path):
         "rows": n_rows,
         "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "script": "scripts/lux_analysis.py",
-        "git_commit": git_commit(),
+        "git_commit": provenance.git_commit(),
         "parameters": {
             "downsample": args.downsample,
             "limit": args.limit,
@@ -91,9 +75,7 @@ def write_provenance(save_path, args, n_rows, base_path):
         "data_root": str(paths.data_root(base_path)),
         "machine": platform.node(),
         "python": sys.version.split()[0],
-        "packages": {
-            name: __import__(name).__version__ for name in ("pandas", "numpy", "pyarrow")
-        },
+        "packages": provenance.package_versions(),
     }
 
     provenance_path = save_path.with_suffix(".provenance.json")

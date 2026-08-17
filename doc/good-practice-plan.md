@@ -195,23 +195,31 @@ work is going, not where it has been.
 - [ ] **Compare light against activity on identical sampling**, which is the reason for
       the move to PAXMIN and what the secondary aims require.
 
-## Phase 5 — Notebooks (half a day, low risk)
+## Phase 5 — Notebooks (DONE 2026-08-17, except the output-versioning decision)
 
-Can be done piecemeal, whenever a notebook is next opened.
-
-- [ ] **Replace the 31 hard-coded absolute paths** across 6 notebooks with `paths.py`
-      calls. Concentrated in `01 - Data exploration` (18), then `06` (5), `09` (3),
-      `03` (2), `08` (2), `04` (1). Mechanical, and it makes every notebook portable
-      between your PC, the W: drive and BlueBEAR.
-- [ ] **Add a provenance cell** at the top of each notebook printing `paths.describe()`
-      and the current git commit, so a saved notebook records the state it ran against.
-- [ ] **Write `notebooks/README.md`** giving the run order and what each notebook is for
-      — especially useful given the recent renumbering.
+- [x] **All 23 hard-coded absolute paths replaced** with `paths` lookups, across notebooks
+      01, 03, 04, 06 and 09 (08 was done earlier). Each substitution was verified to
+      resolve to exactly the same file, so the notebooks were not re-executed and their
+      stored outputs remain valid. The 8 remaining occurrences are inside stored *outputs*,
+      not code, and will clear when those cells are next run.
+- [x] **Provenance cell added** to the seven notebooks that run anything, calling
+      `provenance.describe()` — commit, machine, Python and package versions, and the
+      resolved roots.
+- [x] **`src/ambient_light_epilepsy/provenance.py` added**, so notebooks and the driver
+      script share one implementation instead of `lux_analysis.py` carrying its own
+      `git_commit`.
+- [x] **`notebooks/README.md` written** — run order, status of each notebook, the
+      conventions, and which reruns need thought.
 - [ ] **Decide how notebook outputs are versioned.** Stored outputs make notebooks
       valuable as a record but produce unreadable diffs. Options in Open questions.
-- [ ] **Promote settled logic out of notebooks.** The frequency-matching functions in
-      `03` and the PAXMIN preprocessing in `09` are real analysis code living in cells.
-      Once stable they belong in `src/`, where they can be tested and reused.
+- [ ] **Promote settled logic out of notebooks.** The frequency-matching functions in `03`
+      belong in `src/` where they can be tested. The PAXMIN preprocessing in `09` is the
+      same problem and is tracked under Phase 4b.
+
+One behaviour change worth noting: notebook 03 previously wrote matched-control lists to
+a copy inside the repository while the analysis read them from the W: drive. It now writes
+to the canonical `<data root>/processed`, which is the location actually read. The
+matching is seeded, so a rerun reproduces the same participants.
 
 ## Phase 6 — Environment reproducibility (1 hour)
 
@@ -246,7 +254,7 @@ opened.
 | 3 | Testing | Done — but raised an open question about the IS definition |
 | 4 | Close the provenance gap | Passes one and two done; pass three rescoped to input checksums |
 | 4b | The PAXMIN route | Not started — the analysis headed for publication |
-| 5 | Notebooks | Not started — piecemeal |
+| 5 | Notebooks | Done, except the output-versioning decision |
 | 6 | Environment reproducibility | Not started |
 
 ## Open questions
