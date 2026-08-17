@@ -19,6 +19,45 @@ Template:
 
 ---
 
+## 2026-08-17 — Cohort definition promoted out of notebook 03
+
+**Ran:** Moved the frequency-matching logic from notebook 03 into
+`ambient_light_epilepsy.matching`, added `scripts/build_cohort.py` to drive it, and wrote
+15 tests. Notebook 03 now imports the same functions and only explores and plots; it no
+longer writes anything.
+
+**Verified first, changed second.** Before touching the notebook, the promoted code was
+run against both cycles and compared against the cohort files already in use:
+
+```
+cycle G   cases 82/82 identical   controls 276/276 identical
+cycle H   cases 110/110 identical  controls 393/393 identical
+```
+
+Same participants, same order. The refactor did not alter the study population, which was
+the risk worth checking — a silently different cohort would invalidate every downstream
+result while still looking plausible.
+
+**Why this one.** Cohort definition is pipeline, not exploration: it produces the files
+everything downstream depends on, and it was being run by hand in a notebook whose cells
+had last executed out of order. It is now one seeded command that records its own commit
+hash, control ratio and seed in a provenance sidecar.
+
+**Found while testing:** the control ratio is a **ceiling, not a target**. Strata with too
+few eligible participants contribute what they have, which is why the real cohort achieves
+3.37 controls per case against 4 requested. My first test asserted the ratio was met and
+failed; the assertion was wrong, not the code. There are now two tests — one for the
+ceiling invariant, one confirming the ratio is met exactly when the pool is deep enough —
+so a genuine sampling bug stays distinguishable from thin data.
+
+**Also:** notebook 03 re-executed cleanly top to bottom, which it could not previously be
+shown to do. Two whitespace-only cells elsewhere were carrying stale outputs from deleted
+code, including one reporting "Number of PWE: 110" with no code above it; cleared.
+
+**Next:** the same promotion for the PAXMIN preprocessing in notebook 09.
+
+---
+
 ## 2026-08-17 — Preprocessing scripts parameterised
 
 **Ran:** No analysis. Rewrote the three R preprocessing steps and their Slurm submission

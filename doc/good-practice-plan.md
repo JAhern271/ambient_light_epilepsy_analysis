@@ -212,9 +212,11 @@ work is going, not where it has been.
       conventions, and which reruns need thought.
 - [ ] **Decide how notebook outputs are versioned.** Stored outputs make notebooks
       valuable as a record but produce unreadable diffs. Options in Open questions.
-- [ ] **Promote settled logic out of notebooks.** The frequency-matching functions in `03`
-      belong in `src/` where they can be tested. The PAXMIN preprocessing in `09` is the
-      same problem and is tracked under Phase 4b.
+- [x] **Frequency matching promoted out of notebook 03** into
+      `ambient_light_epilepsy.matching`, driven by `scripts/build_cohort.py`, with 15
+      tests. Verified to reproduce the existing cohort participant-for-participant in
+      both cycles before anything else was changed. The PAXMIN preprocessing in `09` is
+      the same job and is tracked under Phase 4b.
 
 One behaviour change worth noting: notebook 03 previously wrote matched-control lists to
 a copy inside the repository while the analysis read them from the W: drive. It now writes

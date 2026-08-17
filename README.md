@@ -91,11 +91,18 @@ The notebooks are numbered in pipeline order. Steps 01–03 produce the cohort f
 everything downstream depends on; they only need re-running if the cohort definition
 changes.
 
+Building the cohort is a script rather than a notebook, since everything downstream
+depends on its output:
+
+```bash
+python scripts/build_cohort.py --dry-run
+```
+
 | Step | Purpose |
 |---|---|
 | `01 - Data exploration` | Convert raw NHANES `.xpt` files to parquet |
 | `02 - Finding PWE` | Identify people with epilepsy from prescription data |
-| `03 - Demographics of PWE` | Select frequency-matched controls |
+| `03 - Demographics of PWE` | Explore cases and check control balance (build via the script) |
 | `04 - Timezone confirmation` | Verify LUX timestamps are local clock time |
 | `05 - Cleaning LUX data` | Wear-time cleaning of PAXLUX (superseded by the PAXMIN route) |
 | `06 - Testing metrics` | Develop and sanity-check the light metrics |

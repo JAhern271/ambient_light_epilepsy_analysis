@@ -7,7 +7,7 @@ case definition or matching changes; everything downstream depends on their outp
 |---|---|---|---|
 | 01 | Data exploration | Convert raw NHANES `.xpt` to parquet, inspect each table | Done |
 | 02 | Finding PWE | Identify people with epilepsy from prescription data | Done |
-| 03 | Demographics of PWE | Select frequency-matched controls | Done |
+| 03 | Demographics of PWE | Explore cases, check control balance | Done — building is now `scripts/build_cohort.py` |
 | 04 | Timezone confirmation | Verify LUX timestamps are local clock time | Done |
 | 05 | Cleaning LUX data | Wear-time cleaning of PAXLUX | **Superseded** — see below |
 | 06 | Testing metrics | Develop and sanity-check the light metrics | Done |
@@ -54,10 +54,10 @@ settled should move into the package where it can be tested — see the plan.
 ## Reruns worth thinking about first
 
 - **01** converts `.xpt` files to parquet. Rerunning overwrites them.
-- **03** writes the matched-control lists. It now saves to the canonical
-  `<data root>/processed`, which on the W: drive is the location the analysis actually
-  reads — previously it wrote to a copy inside the repository. The matching is seeded
-  (`default_rng(42)`), so a rerun reproduces the same participants.
+- **03** no longer writes anything, so it is safe to rerun. Building the cohort moved to
+  `scripts/build_cohort.py`, which writes to the canonical `<data root>/processed` — the
+  location the analysis actually reads — with a provenance sidecar. The matching is seeded
+  (`default_rng(42)`), so the notebook and the script give the same cohort.
 - **08** reads a results CSV and is cheap to rerun.
 
 Notebooks 01, 03, 04, 06 and 09 had their paths converted without being re-executed, so
