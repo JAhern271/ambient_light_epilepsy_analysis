@@ -45,13 +45,24 @@ non-significance was an artefact of the mixed-resolution implementation, which a
 participant-varying noise to the measure. The adjusted effect is −7.8% of the control mean
 (previously −10.9%).
 
+**Verified: no 1 Hz recompute is needed for IS.** Corrected IS was computed directly from
+the 1 Hz recordings for 6 participants and compared against the value derived from their
+5-minute files. They agree to a **maximum absolute difference of 3e-06 (0.001%)** — the
+residual comes from the centre-aligned 5-minute binning shifting a few samples across
+hour boundaries. Because corrected IS resamples to hourly before computing, the source
+resolution no longer matters, which is exactly the property the fix was meant to restore.
+
+The corrected IS values computed here from the 5-minute data are therefore valid for the
+1 Hz analysis too, and the stale IS column in `lux_1hz_fmatch_analysis.csv` can be
+replaced without rerunning the metric computation.
+
 **Caveats.**
 
-- Computed on the **5-minute** data; notebook 08's published figures came from the **1 Hz**
-  run. Because IS now resamples to hourly first, the two should agree closely, but the
-  1 Hz analysis has not been rerun to confirm it.
-- Notebook 08's displayed outputs and its IS conclusion are now superseded and need
-  regenerating.
+- Only the IS column is affected. Every other metric is untouched by this change.
+- `IV` genuinely differs between 5-minute and 1 Hz, so the two results files are still not
+  interchangeable wholesale, and which resolution is the reported one remains a decision.
+- Notebook 08's displayed outputs and its IS conclusion are superseded. Regenerating it is
+  a rerun of statistics over an existing CSV, not a recompute of the metrics.
 - `IV` is unchanged and remains resolution dependent by nature, so 5-minute and 1 Hz IV
   values still cannot be compared.
 - One participant yields NaN IS (no variance); n = 860 adjusted, 781 with employment and
@@ -61,7 +72,9 @@ participant-varying noise to the measure. The adjusted effect is −7.8% of the 
 IS column moved by design. All 41 tests pass. Tests now assert that IS is independent of
 input resolution, which is the property the old implementation lacked.
 
-**Next:** rerun the 1 Hz analysis, then regenerate notebook 08.
+**Next:** regenerate notebook 08 against corrected IS. A full 1 Hz metric rerun is not
+required, though rerunning it once through `scripts/lux_analysis.py --downsample 1hz`
+would produce a provenance-stamped results file under the dated results scheme.
 
 ---
 

@@ -97,8 +97,16 @@ right.
       depression (p = 0.035, previously p = 0.056). See [analysis-log.md](analysis-log.md).
 - [x] **Regression fixture regenerated** deliberately, and tests now assert that IS is
       independent of input resolution.
-- [ ] **Rerun the 1 Hz analysis** and regenerate notebook 08, whose displayed outputs and
-      IS conclusion are now superseded.
+- [x] **Confirmed no 1 Hz metric recompute is needed.** Corrected IS computed from 1 Hz
+      recordings matches the 5-minute-derived value to 3e-06 (0.001%), because IS now
+      resamples to hourly first.
+- [ ] **Regenerate notebook 08**, whose displayed IS values and stated IS conclusion are
+      superseded. This is a rerun of statistics over an existing CSV, not a metric
+      recompute.
+- [ ] **Replace the stale IS column** in `lux_1hz_fmatch_analysis.csv`, or rerun
+      `scripts/lux_analysis.py --downsample 1hz` once to get a provenance-stamped file.
+- [ ] **Decide which resolution is reported.** `IV` legitimately differs between 5-minute
+      and 1 Hz, so the two results files are not interchangeable wholesale.
 
 ## Phase 4 — Close the provenance gap (1–2 days, medium risk)
 
