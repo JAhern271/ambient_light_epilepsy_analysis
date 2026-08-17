@@ -65,21 +65,39 @@ The single highest-value phase. Nothing here can break the analysis.
       that the analysis runs as a script and how to invoke it.
 - [x] **Deleted the on-disk `.ipynb_checkpoints`** directories.
 
-## Phase 3 — Notebooks (half a day, low risk)
+## Phase 3 — Testing (DONE 2026-08-17)
 
-- [ ] **Replace the 31 hard-coded absolute paths** across 6 notebooks with `paths.py`
-      calls. Concentrated in `01 - Data exploration` (18), then `06` (5), `09` (3),
-      `03` (2), `08` (2), `04` (1). Mechanical, and it makes every notebook portable
-      between your PC, the W: drive and BlueBEAR.
-- [ ] **Add a provenance cell** at the top of each notebook printing `paths.describe()`
-      and the current git commit, so a saved notebook records the state it ran against.
-- [ ] **Write `notebooks/README.md`** giving the run order and what each notebook is for
-      — especially useful given the recent renumbering.
-- [ ] **Decide how notebook outputs are versioned.** Stored outputs make notebooks
-      valuable as a record but produce unreadable diffs. Options in Open questions.
-- [ ] **Promote settled logic out of notebooks.** The frequency-matching functions in
-      `03` and the PAXMIN preprocessing in `09` are real analysis code living in cells.
-      Once stable they belong in `src/`, where they can be tested and reused.
+**This phase comes before any change to metric code**, including the outstanding protocol
+items. A test written after a change can only confirm the new behaviour, not that it is
+right.
+
+- [x] **`tests/` set up with pytest**, added as a `dev` extra. 38 tests, running in
+      under 7 seconds.
+- [x] **Metrics tested against synthetic signals with known answers** — square wave,
+      sinusoid, constant, alternating and white noise, each with hand-derived expected
+      values for M10, L5, RA, midpoints, IS and IV.
+- [x] **Synthetic example dataset** — built on the fly by the `example_data_root`
+      fixture rather than committed as binary files, so the full loading path is
+      exercised without the W: drive and nothing opaque enters git.
+- [x] **Regression test** pinning real values for 6 cycle G participants, with
+      `tests/regenerate_regression_fixture.py` to update it deliberately. Skips
+      automatically where the real data is unreachable.
+- [x] **Known-suspect areas checked.** See the 2026-08-17 entry in
+      [analysis-log.md](analysis-log.md) — this turned up a real problem in
+      `interdaily_stability`, described below.
+
+### Outstanding decision: how should IS be defined?
+
+`interdaily_stability` mixes time resolutions — hourly bins in the numerator, raw epochs
+in the denominator. On real participants this makes IS about **2.2x lower** than at
+matched hourly resolution, by a factor that **varies per participant** (1.09–4.90), so it
+does not cancel in a group comparison. Reduced IS in PWE is one of the four headline
+findings, so this needs resolving before write-up.
+
+- [ ] Decide between resampling to hourly before computing IS, or using time-of-day bins
+      at the epoch resolution.
+- [ ] Recheck whether the PWE-versus-control IS difference survives the change.
+- [ ] Regenerate any affected results and note the change in the analysis log.
 
 ## Phase 4 — Close the provenance gap (1–2 days, medium risk)
 
@@ -102,25 +120,23 @@ files nothing in the repository knows how to make.
       download is detectable. This would settle the open question about the H cohort's
       PAXMIN data.
 
-## Phase 5 — Testing (1 day, low risk, high payoff)
+## Phase 5 — Notebooks (half a day, low risk)
 
-Nothing currently verifies the circadian metrics. These are exactly the functions where
-an off-by-one in a rolling window or a wrong denominator produces plausible numbers
-rather than an error.
+Can be done piecemeal, whenever a notebook is next opened.
 
-- [ ] **Set up `tests/` with pytest**, and add `pytest` as a dev extra.
-- [ ] **Test the metrics against synthetic signals with known answers** — a perfect
-      12h-on/12h-off square wave has analytically known M10, L5, RA and IS; a constant
-      signal has IV = 0 and undefined RA; a single-day recording should behave sensibly.
-- [ ] **Commit a small synthetic example dataset** so tests run without the W: drive.
-      Wilson: "provide a simple example or test dataset".
-- [ ] **Add a regression test** pinning current outputs for a handful of SEQNs, so
-      refactoring cannot silently move results. The 12-participant comparison run during
-      the path refactor is the template.
-- [ ] **Check the known-suspect areas** while writing tests: `interdaily_stability` uses
-      hourly bins against 5-minute samples in a way worth confirming against the
-      Witting et al. definition; `intradaily_variability` assumes evenly spaced samples
-      with no gaps, which fragmented wear may violate.
+- [ ] **Replace the 31 hard-coded absolute paths** across 6 notebooks with `paths.py`
+      calls. Concentrated in `01 - Data exploration` (18), then `06` (5), `09` (3),
+      `03` (2), `08` (2), `04` (1). Mechanical, and it makes every notebook portable
+      between your PC, the W: drive and BlueBEAR.
+- [ ] **Add a provenance cell** at the top of each notebook printing `paths.describe()`
+      and the current git commit, so a saved notebook records the state it ran against.
+- [ ] **Write `notebooks/README.md`** giving the run order and what each notebook is for
+      — especially useful given the recent renumbering.
+- [ ] **Decide how notebook outputs are versioned.** Stored outputs make notebooks
+      valuable as a record but produce unreadable diffs. Options in Open questions.
+- [ ] **Promote settled logic out of notebooks.** The frequency-matching functions in
+      `03` and the PAXMIN preprocessing in `09` are real analysis code living in cells.
+      Once stable they belong in `src/`, where they can be tested and reused.
 
 ## Phase 6 — Environment reproducibility (1 hour)
 
@@ -139,14 +155,23 @@ the outstanding protocol items (100 lux threshold, day–night contrast, 06:00�
 window, BMI and physical activity matching), the ASM-versus-self-report case definition
 sensitivity check, mediation modelling, and the sleep metrics.
 
-One dependency is worth respecting: **do Phase 5 before changing any metric code.**
+One dependency is worth respecting: **do Phase 3 before changing any metric code.**
 Tests written after a change can only confirm the new behaviour, not that it is right.
 
-## Suggested order
+## Order
 
-Phases 1 and 2 first — they are pure gain and cost half a day. Phase 5 next, because
-tests protect everything after it. Then Phase 4, which is the real scientific gap and
-the most effort. Phase 3 can be done piecemeal whenever a notebook is next opened.
+**Phases are numbered in the order they should be done.** Work through them in sequence;
+Phase 5 is the one exception and can be picked up piecemeal whenever a notebook is next
+opened.
+
+| Phase | | Status |
+|---|---|---|
+| 1 | Documentation | Done, except the licence |
+| 2 | Repository hygiene | Done |
+| 3 | Testing | Done — but raised an open question about the IS definition |
+| 4 | Close the provenance gap | Not started — the real scientific gap, and the most effort |
+| 5 | Notebooks | Not started — piecemeal |
+| 6 | Environment reproducibility | Not started |
 
 ## Open questions
 

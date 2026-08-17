@@ -27,6 +27,7 @@ Thumbs.db
 
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Data (do NOT version raw NHANES data)
 data/raw/

@@ -28,6 +28,12 @@ convert = ["pyreadstat>=1.2"]
 # For running the analysis notebooks
 notebooks = ["jupyterlab>=4.0", "ipykernel>=6.0"]
 
+# For running the test suite: pip install -e ".[dev]"
+dev = ["pytest>=7.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["ambient_light_epilepsy"]

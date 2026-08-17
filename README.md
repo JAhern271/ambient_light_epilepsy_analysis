@@ -107,6 +107,21 @@ python scripts/lux_analysis.py --downsample 5min
 Use `--limit N` for a quick smoke test; limited runs write to a separate filename so they
 cannot overwrite real results. `python scripts/lux_analysis.py --help` lists all options.
 
+## Tests
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+The metric tests check values derived by hand from synthetic signals, so they verify
+correctness rather than just pinning current behaviour. Tests needing the full LUX
+dataset skip automatically where it is unreachable, so the suite passes on any machine.
+
+`tests/data/regression_expected.csv` pins metric values for six real participants. If it
+starts failing after an intentional change to a metric, regenerate it with
+`python tests/regenerate_regression_fixture.py` and record why in the analysis log.
+
 ## Repository layout
 
 ```
@@ -116,6 +131,7 @@ notebooks/      Numbered analysis notebooks
 results/        Analysis outputs, in dated directories
 scripts/        Driver scripts for long-running analyses
 src/            The ambient_light_epilepsy package (all reusable logic)
+tests/          Test suite
 data/           Raw and derived data (gitignored, not distributed)
 ```
 

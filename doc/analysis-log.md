@@ -19,6 +19,53 @@ Template:
 
 ---
 
+## 2026-08-17 — Test suite added, and a resolution problem in IS
+
+**Ran:** Built `tests/` (38 tests) covering the light metrics against synthetic signals
+with analytically known answers, path resolution across both directory layouts, and an
+end-to-end run over a synthetic cohort. Added a regression test pinning real values for
+6 cycle G participants.
+
+**Found — needs a decision.** `interdaily_stability` computes its numerator from **hourly**
+bins but its denominator from the **raw epochs**, so the two halves of the ratio are at
+different time resolutions. The denominator therefore includes within-hour variance that
+the numerator cannot capture, which pushes IS down.
+
+Measured on 10 real cycle G participants, IS at matched hourly resolution is on average
+**2.2x higher** than the implemented value (mean 0.201 vs 0.102). The ratio is **not
+constant** — it ranges from 1.09 to 4.90 across participants — so this is not a simple
+rescaling that cancels in a group comparison.
+
+Two consequences:
+
+1. IS values are not comparable with published figures computed at a single resolution.
+2. IS is not comparable between this project's own 5-minute and 1 Hz analyses. The 1 Hz
+   denominator carries far more high-frequency variance, so its IS will be lower again.
+
+This matters because **reduced IS in PWE is one of the four headline findings**. The
+direction of the effect may well survive — the group difference could be robust to how IS
+is defined — but that needs checking rather than assuming.
+
+**Not changed.** The metric code is untouched. Deciding whether to resample to hourly
+before computing IS, or to use time-of-day bins at the epoch resolution, is a
+methodological choice, and the tests now exist to make the change safely.
+
+**Also found:**
+
+- `intradaily_variability` is inherently resolution dependent too, so 5-minute and 1 Hz
+  IV values cannot be compared either. Standard behaviour, but worth stating explicitly.
+- `get_sampling_interval_minutes` infers the epoch length from the **first two samples
+  only**. A recording that begins with a gap reports the wrong sampling rate, and every
+  metric scaled by it is then wrong. Pinned by a test.
+- IV returns NaN, not 0, for a perfectly constant recording (0/0). Relevant if a sensor
+  ever fails and returns a constant.
+- M10 midpoint on a tied plateau resolves to the earliest maximal window. Matters for
+  synthetic or heavily rounded data, rarely for real recordings.
+
+**Next:** decide how IS should be defined, then Phase 4.
+
+---
+
 ## 2026-08-17 — Repository restructuring
 
 **Ran:** No analysis. Declared dependencies in `pyproject.toml`, replaced all hard-coded
