@@ -50,6 +50,9 @@ def compute_lux_summary(seqn_array, year, base_path, downsample="5min"):
             if df.empty:
                 print(f"ERROR: table is empty: {file_path}")
                 continue
+            
+    # here would be a natural place to break up the function into a load and an
+    # analysis part. analysis would deal with df with time/lux cols. 
     
             # Print a statemennt indicating that the analysis for SEQN is happening
             # \r moves cursor to start of line, end="" prevents a new line
