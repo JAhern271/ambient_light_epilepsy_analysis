@@ -1,0 +1,20 @@
+# Normalise line endings.
+#
+# Scripts are edited on Windows but run on Linux (BlueBEAR). A shell script
+# committed with CRLF fails there with "bad interpreter: /bin/bash^M", so the
+# endings must be forced to LF regardless of the machine they were written on.
+
+* text=auto
+
+*.sh   text eol=lf
+*.R    text eol=lf
+*.py   text eol=lf
+*.toml text eol=lf
+*.cff  text eol=lf
+*.md   text eol=lf
+
+# Notebooks are JSON; keep them from being mangled by CRLF conversion
+*.ipynb text eol=lf
+
+*.parquet binary
+*.xpt     binary

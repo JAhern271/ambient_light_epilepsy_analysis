@@ -19,6 +19,38 @@ Template:
 
 ---
 
+## 2026-08-17 — Preprocessing scripts recovered and committed
+
+**Ran:** No analysis. Located the missing preprocessing code on the W: drive under
+`scripts/` and committed it verbatim, normalising line endings to LF and adding a
+`.gitattributes` so shell scripts cannot be committed with CRLF and fail on Linux.
+
+**Found:** The pipeline is **R**, not Python — `convert_xpt.R`, `convert_paxlux.R` and
+`downsample_lux.R`, each with a Slurm submission script loading `R/4.5.0` and
+`arrow-R/17.0.0.1` on BlueBEAR. This closes the largest reproducibility gap: the 5-minute
+downsampling that every reported metric depends on is now under version control.
+
+Three things the recovered code revealed:
+
+1. **The cohort is hard-coded** in all three scripts, behind an "EDIT THIS" banner. The
+   cycle G outputs were made by editing these same files and that version was never
+   saved, so **G and H preprocessing cannot be shown to have been identical**. This is
+   the strongest argument for the parameterisation planned in the next pass.
+2. **Binning is centre-aligned** (`TIME_ALIGN <- "center"`), so a 5-minute timestamp marks
+   the middle of its bin: 06:57:30 covers 06:55–07:00. Undocumented until now, and it
+   shifts samples relative to the 07:00 and 20:00 window boundaries — differently in the
+   5-minute and 1 Hz analyses.
+3. **`run_lux_analysis.sh` activates a venv inside a second clone** of this repository on
+   the W: drive. That clone is 6 commits behind and carries uncommitted changes to
+   `scripts/lux_analysis.py`. It needs reconciling before it is pulled.
+
+**Not changed:** the scripts are committed exactly as they ran, so this commit alters no
+behaviour. Fixes are listed in `scripts/README.md` for the next pass.
+
+**Next:** parameterise cohort and paths, then reconcile the second clone.
+
+---
+
 ## 2026-08-17 — Test suite added, and a resolution problem in IS
 
 **Ran:** Built `tests/` (38 tests) covering the light metrics against synthetic signals

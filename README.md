@@ -137,12 +137,15 @@ data/           Raw and derived data (gitignored, not distributed)
 
 ## Known gaps
 
-- The LUX preprocessing that produces the 5-minute parquet files is not in this
-  repository, so that step is not currently reproducible. This is the highest-priority
-  outstanding item.
-- There are no automated tests for the circadian metric functions.
+- The preprocessing scripts are now committed (`scripts/`), but each still hard-codes its
+  cohort behind an "EDIT THIS" block, so the cycle G and H outputs cannot be shown to have
+  been produced identically. See `scripts/README.md`.
+- `interdaily_stability` mixes time resolutions, making IS values incomparable both with
+  published figures and between this project's own 5-minute and 1 Hz runs. See
+  [doc/analysis-log.md](doc/analysis-log.md).
 - `PAXMIN_H` appears to have substantially more missing data than `PAXMIN_G`; whether
   this is real or a conversion problem is unresolved.
+- A second, diverging clone of this repository exists on the W: drive.
 
 ## Licence
 

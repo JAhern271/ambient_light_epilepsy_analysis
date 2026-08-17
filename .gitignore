@@ -25,6 +25,11 @@ Thumbs.db
 *.log
 *.bak
 
+# Slurm job logs, written next to the submission scripts on the HPC
+*.out
+*.err
+*.stats
+
 __pycache__/
 *.pyc
 .pytest_cache/

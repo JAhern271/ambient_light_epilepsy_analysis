@@ -104,21 +104,36 @@ findings, so this needs resolving before write-up.
 **This is the most important phase scientifically.** The analysis currently starts from
 files nothing in the repository knows how to make.
 
-- [ ] **Script the NHANES download.** `scripts/00_fetch_nhanes.py` — fetch the `.xpt`
-      files for cohorts G and H from the CDC, recording URLs and checksums. Currently
-      undocumented; the commit message notes the conversion was done on BlueBEAR with
-      "no git trace of this".
-- [ ] **Script the XPT to parquet conversion.** `nhanes.xpt_to_parquet` exists but no
-      driver calls it over the full table list.
-- [ ] **Script the LUX preprocessing — the biggest gap.** The analysis reads
-      `PAXLUX_{G,H}/parquet_5min/SEQN_*.parquet`, roughly 7,000 files per cohort derived
-      from the `*_Lux.tar.bz2` archives. No code in this repository produces them, so the
-      5-minute downsampling — a decision that directly affects every reported metric — is
-      currently unreproducible and undocumented. Recovering or rewriting this is the
-      priority.
+### Pass one — recover and commit (DONE 2026-08-17)
+
+- [x] **The preprocessing code was found on the W: drive**, not lost: three R scripts with
+      Slurm submission scripts. Committed verbatim so the commit changes no behaviour.
+- [x] **`.gitattributes` added** forcing LF on `.sh` and `.R`, so a script edited on
+      Windows cannot reach BlueBEAR with CRLF and fail as `bad interpreter: /bin/bash^M`.
+- [x] **Slurm job logs gitignored** (`*.out`, `*.err`, `*.stats`).
+- [x] **`scripts/README.md`** documenting pipeline order, how to submit, and the known
+      problems left unfixed.
+
+### Pass two — parameterise
+
+- [ ] **Make the cohort an argument** in `convert_xpt.R`, `convert_paxlux.R` and
+      `downsample_lux.R`. All three hard-code cycle H behind an "EDIT THIS" banner, so the
+      G outputs were produced by a version of the file that no longer exists. Until this
+      is fixed, G and H preprocessing cannot be shown to have been identical.
+- [ ] **Remove the absolute RDS paths** from the `.R` and `.sh` files, deriving the
+      project root from the script location as the Python code now does.
+- [ ] **Reconcile `run_lux_analysis.sh`**, which activates a venv inside a second clone of
+      this repository on the W: drive and predates the Python script's command-line
+      interface.
+- [ ] **Reconcile the second clone** on the W: drive: 6 commits behind, with uncommitted
+      changes to `scripts/lux_analysis.py`.
+- [ ] **Script the NHANES download** — fetch the `.xpt` files from the CDC, recording URLs
+      and checksums. Still undocumented.
 - [ ] **Write a manifest** of raw inputs with checksums, so corruption or a partial
       download is detectable. This would settle the open question about the H cohort's
       PAXMIN data.
+- [ ] **Document the centre-aligned binning decision** in the methods, and check whether
+      it should be `start` rather than `center` given the hour-boundary windows.
 
 ## Phase 5 — Notebooks (half a day, low risk)
 
@@ -169,7 +184,7 @@ opened.
 | 1 | Documentation | Done, except the licence |
 | 2 | Repository hygiene | Done |
 | 3 | Testing | Done — but raised an open question about the IS definition |
-| 4 | Close the provenance gap | Not started — the real scientific gap, and the most effort |
+| 4 | Close the provenance gap | Pass one done — scripts recovered and committed; pass two parameterises them |
 | 5 | Notebooks | Not started — piecemeal |
 | 6 | Environment reproducibility | Not started |
 

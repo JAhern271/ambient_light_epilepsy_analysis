@@ -85,7 +85,12 @@ Timestamps are labelled UTC but represent **local clock time**; this was verifie
 notebook 04 by confirming that population-level first and last light exposure cluster at
 07:00–09:00 and 17:00–21:00.
 
-> The code producing these files is not currently in this repository. See the plan.
+The 5-minute files are produced from the 1 Hz files by `scripts/downsample_lux/`, which
+bins with **centre alignment**: a timestamp marks the middle of its bin, so 06:57:30
+covers 06:55:00–07:00:00. This shifts samples relative to the hour boundaries the day and
+night windows use, and differs between the 5-minute and 1 Hz analyses.
+
+See `scripts/README.md` for the full preprocessing pipeline and its known limitations.
 
 ### Employment — `OCQ`
 
