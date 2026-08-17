@@ -1,5 +1,6 @@
-# Ignore data and output folders
-data/
+# Ignore the data folder at the repository root only.
+# A bare "data/" would also match tests/data/, which holds committed fixtures.
+/data/
 *.edf
 *.set
 *.fdt
@@ -35,6 +36,6 @@ __pycache__/
 .pytest_cache/
 
 # Data (do NOT version raw NHANES data)
-data/raw/
-data/processed/
-data/interim/
+/data/raw/
+/data/processed/
+/data/interim/
