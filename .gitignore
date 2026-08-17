@@ -13,6 +13,9 @@ data/
 .venv/
 venv/
 
+# Machine-specific path overrides (config.toml IS committed)
+config.local.toml
+
 # Ignore system files
 .DS_Store
 Thumbs.db

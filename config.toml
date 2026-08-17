@@ -1,0 +1,29 @@
+# Where the data lives on each machine this project runs on.
+#
+# Profiles are tried in the order below and the first one that exists on disk
+# is used, so the same notebooks and scripts run unchanged on every machine.
+# Override with the ALE_PROFILE, ALE_DATA_ROOT or ALE_ANALYSIS_ROOT environment
+# variables, or by adding a profile to config.local.toml (not committed).
+#
+# Relative paths are interpreted relative to the repository root.
+
+profile_order = ["hpc", "w_drive", "local"]
+
+
+# BlueBEAR HPC, used for the full 1 Hz LUX analysis
+[profiles.hpc]
+data_root = "/rds/projects/t/terryjr-fellowship-ahern/projects/ambient_light_epilepsy_analysis/data"
+analysis_root = "/rds/projects/t/terryjr-fellowship-ahern/projects/ambient_light_epilepsy_analysis/analysis"
+
+
+# University network drive: the complete dataset, including PAXLUX
+[profiles.w_drive]
+data_root = "W:/projects/ambient_light_epilepsy_analysis/data"
+analysis_root = "W:/projects/ambient_light_epilepsy_analysis/analysis"
+
+
+# Partial copy inside the repository. Enough for cohort definition work; does
+# not contain the PAXLUX recordings.
+[profiles.local]
+data_root = "data"
+analysis_root = "results"

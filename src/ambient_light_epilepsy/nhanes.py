@@ -6,11 +6,10 @@ Created on Mon Jan 19 13:08:20 2026
 """
 
 from pathlib import Path
-import pyreadstat
 import pandas as pd
 import numpy as np
 
-
+from . import paths
 
 
 
@@ -38,6 +37,10 @@ def xpt_to_parquet(
     parquet_path : Path
         Path to the saved parquet file.
     """
+    # Imported here rather than at module level: pyreadstat is only needed for
+    # the one-off XPT conversion, so the rest of the package works without it.
+    import pyreadstat
+
     xpt_path = Path(xpt_path)
 
     if not xpt_path.exists():
@@ -66,11 +69,10 @@ def xpt_to_parquet(
 
 
 
-def load_partial_demo(year, base_path):
+def load_partial_demo(year, base_path=None):
     # Load the demographics table
-    p = base_path / f"{year}" / f"DEMO_{year}.parquet"
-    #p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/DEMO_{year}.parquet")
-    
+    p = paths.raw_table(year, "DEMO", base_path)
+
     cols_to_load = {"SEQN": "ID",
                     "RIDAGEYR": "age", 
                     "RIAGENDR": "sex", 
@@ -90,9 +92,9 @@ def load_partial_demo(year, base_path):
     return df
 
 
-def load_PAXHD(year, base_path):
-    
-    p = base_path / f"{year}" / f"PAXHD_{year}.parquet"
+def load_PAXHD(year, base_path=None):
+
+    p = paths.raw_table(year, "PAXHD", base_path)
     df = pd.read_parquet(p)
     df = df.set_index("SEQN")
     
@@ -165,10 +167,9 @@ def add_demo_labels(df_input):
 
 
 
-def load_employment(year, base_path):
+def load_employment(year, base_path=None):
 
-    p = base_path / f"{year}" / f"OCQ_{year}.parquet"
-    #p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/OCQ_{year}.parquet")
+    p = paths.raw_table(year, "OCQ", base_path)
 
     cols = ["SEQN", "OCD150"]
 
@@ -184,10 +185,9 @@ def load_employment(year, base_path):
 
 
 
-def load_dpq(year, base_path, dropna=True):
-    
-    p = base_path / f"{year}" / f"DPQ_{year}.parquet"
-    #p = Path(f"W:/projects/ambient_light_epilepsy_analysis/data/{year}/dpq_{year}.parquet")
+def load_dpq(year, base_path=None, dropna=True):
+
+    p = paths.raw_table(year, "DPQ", base_path)
 
     phq_cols = [
         "DPQ010","DPQ020","DPQ030",
@@ -213,7 +213,7 @@ def load_dpq(year, base_path, dropna=True):
 
 
 
-def add_employment_and_depression_status(df_all, base_path):
+def add_employment_and_depression_status(df_all, base_path=None):
     # Load the OCD150 and employment status 
     ocq_G = load_employment("G", base_path)
     ocq_H = load_employment("H", base_path)
@@ -250,7 +250,7 @@ def add_employment_and_depression_status(df_all, base_path):
     return df_all
 
 
-def add_demographic_data(df_all, base_path):
+def add_demographic_data(df_all, base_path=None):
     
     # Load demographics
     demo_G = load_partial_demo("G", base_path)
@@ -280,16 +280,12 @@ def add_demographic_data(df_all, base_path):
     return df_all
 
 
-def add_outdoor_time(df_all, base_path):
+def add_outdoor_time(df_all, base_path=None):
 
     # Load DEQ tables
-    p = base_path / "G" / "DEQ_G.parquet"
-    #p = Path("W:/projects/ambient_light_epilepsy_analysis/data/G/DEQ_G.parquet")
-    deq_G = pd.read_parquet(p, columns=["SEQN","DED120","DED125"])
-
-    p = base_path / "H" / "DEQ_H.parquet"
-    #p = Path("W:/projects/ambient_light_epilepsy_analysis/data/H/DEQ_H.parquet")
-    deq_H = pd.read_parquet(p, columns=["SEQN","DED120","DED125"])
+    deq_cols = ["SEQN", "DED120", "DED125"]
+    deq_G = pd.read_parquet(paths.raw_table("G", "DEQ", base_path), columns=deq_cols)
+    deq_H = pd.read_parquet(paths.raw_table("H", "DEQ", base_path), columns=deq_cols)
 
 
     # --- Clean special values ---

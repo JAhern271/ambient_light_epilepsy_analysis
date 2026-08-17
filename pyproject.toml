@@ -7,9 +7,27 @@ name = "ambient-light-epilepsy"
 version = "0.1.0"
 description = "Ambient light exposure analysis in epilepsy using NHANES"
 authors = [{ name = "Jake Ahern" }]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
+
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "pyarrow>=14.0",
+    "scipy>=1.11",
+    "statsmodels>=0.14",
+    "matplotlib>=3.7",
+    "seaborn>=0.13",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+# Only needed to convert the raw NHANES .xpt files to parquet, which is done
+# once per cohort on the HPC. Install with: pip install -e ".[convert]"
+convert = ["pyreadstat>=1.2"]
+
+# For running the analysis notebooks
+notebooks = ["jupyterlab>=4.0", "ipykernel>=6.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["ambient_light_epilepsy"]
-

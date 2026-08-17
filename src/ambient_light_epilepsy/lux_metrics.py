@@ -7,12 +7,12 @@ Created on Fri Feb 27 15:44:16 2026
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from pathlib import Path
 import pyarrow.parquet as pq
 
+from . import paths
 
-def compute_lux_summary(seqn_array, year, base_path, downsample="5min"):
+
+def compute_lux_summary(seqn_array, year, base_path=None, downsample="5min"):
     """
     Computes:
         - mean lux across recording
@@ -23,16 +23,19 @@ def compute_lux_summary(seqn_array, year, base_path, downsample="5min"):
     
     results = []
     
+    if downsample == "5min":
+        cols = ["timestamp", "mean_lux"]
+    elif downsample is None:
+        cols = ["HEADER_TIMESTAMP", "LUX"]
+    else:
+        raise ValueError(
+            f"Unknown downsample {downsample!r}; expected '5min' or None"
+        )
+
     for seqn in seqn_array:
-        
-        if downsample=="5min":
-            file_path = Path(base_path) / f"PAXLUX_{year}" / "parquet_5min" / f"SEQN_{int(seqn)}_5min.parquet"
-            cols = ["timestamp", "mean_lux"]
-            
-        elif downsample==None:
-            file_path = Path(base_path) / f"PAXLUX_{year}" / "parquet" / f"SEQN_{int(seqn)}.parquet"
-            cols = ["HEADER_TIMESTAMP", "LUX"]
-    
+
+        file_path = paths.lux_file(seqn, year, downsample, base_path)
+
         if not file_path.exists():
             print(f"ERROR: path does not exist: {file_path}")
             continue
