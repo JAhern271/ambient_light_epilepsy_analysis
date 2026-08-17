@@ -143,10 +143,13 @@ files nothing in the repository knows how to make.
       `ALE_OVERWRITE=1`, every script prints its resolved paths before doing work, and
       omitting the cohort prints usage instead of running against the wrong data.
 
-**Not yet verified by execution.** R is not installed on the Windows workstation, so the
-R changes were reviewed by inspection only; the shell scripts are syntax checked and
-their argument handling tested. Run one cohort of one step and check the printed paths
-before trusting a full rerun.
+- [x] **Verified on BlueBEAR** 2026-08-17. `convert_xpt.R H PAXMIN` resolved both roots
+      correctly on RDS, parsed arguments, and skipped the existing parquet. The data root
+      resolves via the `<project root>/../data` candidate, since the repository is checked
+      out beside the data there rather than above it.
+
+Still unexercised: the Slurm submission path (the R was invoked directly), and
+`convert_paxlux` / `downsample_lux` since parameterisation.
 
 ### Pass three — provenance of the raw inputs
 

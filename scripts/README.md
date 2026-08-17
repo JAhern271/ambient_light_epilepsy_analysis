@@ -73,7 +73,14 @@ interval start instead.
 
 ## Verification status
 
-The shell scripts are syntax checked and their argument handling tested. **The R changes
-have not been executed** — R is not installed on the Windows workstation, so they were
-verified by inspection only. Run one cohort of one step first and check the paths printed
-in the job log before trusting a full rerun.
+**Verified on BlueBEAR, 2026-08-17.** `Rscript scripts/convert_xpt/convert_xpt.R H PAXMIN`
+resolved the project root and data root correctly on RDS, parsed its arguments, and
+skipped the existing parquet as intended. Path derivation was exercised without
+`ALE_PROJECT_ROOT` set, so the fallback from the script's own location works.
+
+Note that the repository is checked out *beside* the data on RDS rather than above it, so
+the data root resolves through the `<project root>/../data` candidate.
+
+The shell scripts are syntax checked and their argument handling tested, but the Slurm
+submission path itself has not been run; only the R was invoked directly. `convert_paxlux`
+and `downsample_lux` have not been executed since being parameterised.

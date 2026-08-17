@@ -44,14 +44,38 @@ job id so reruns do not overwrite each other; `convert_xpt` skips existing parqu
 `ALE_OVERWRITE=1`.
 
 **Verification.** The shell scripts are syntax checked and their argument handling tested,
-including the missing-argument case. **The R was not executed** — R is not installed on
-the Windows workstation — so it was reviewed by inspection only. Two bugs were caught that
-way: `ale_lux_dir` rejected any bin width other than 5 minutes, and `ALE_OVERWRITE=0`
-would have counted as true.
+including the missing-argument case. The R could not be run locally — R is not installed
+on the Windows workstation — so it was reviewed by inspection, which caught two bugs:
+`ale_lux_dir` rejected any bin width other than 5 minutes, and `ALE_OVERWRITE=0` would
+have counted as true.
 
-**Next:** run one cohort of one step on BlueBEAR and check the printed paths before
-trusting a full rerun. Reprocessing both cohorts through these scripts is what finally
-closes the G/H provenance gap.
+**Confirmed working on BlueBEAR the same day.** `Rscript scripts/convert_xpt/convert_xpt.R H PAXMIN`
+on a login node resolved:
+
+```
+Project root: /rds/.../ambient_light_epilepsy_analysis/ambient_light_epilepsy_analysis
+Data root   : /rds/.../ambient_light_epilepsy_analysis/data
+Already converted: PAXMIN_H.parquet
+Converted: 0  skipped: 1  missing: 0
+```
+
+Both roots correct, arguments parsed, existing output skipped. Worth recording that the
+repository is checked out **beside** the data on RDS rather than above it, so the data
+root resolves through the `<project root>/../data` candidate rather than the first one —
+the case that motivated supporting two layouts.
+
+One cosmetic bug showed up and was fixed: `ale_check_cohort` returned its argument
+visibly, so R auto-printed `[1] "H"` into every job log.
+
+Still unexercised: the Slurm submission path, and `convert_paxlux` / `downsample_lux`
+since parameterisation.
+
+**Scope note.** The PAXLUX pipeline is now expected to be exploratory rather than
+published. PAXMIN carries 1-minute light *and* activity for the same participants, which
+is ample for circadian-scale analysis and allows light and activity to be compared on
+identical sampling. Published results are intended to come from PAXMIN, so reprocessing
+both cohorts through `convert_paxlux` and `downsample_lux` — previously the top
+outstanding provenance risk — is no longer on the critical path.
 
 ---
 

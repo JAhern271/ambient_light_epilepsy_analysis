@@ -80,7 +80,8 @@ ale_check_cohort <- function(cohort) {
   if (!cohort %in% c("G", "H")) {
     warning("Unrecognised cohort '", cohort, "'. Expected G (2011-12) or H (2013-14).")
   }
-  cohort
+  # Invisible so that calling this at top level does not auto-print the cohort
+  invisible(cohort)
 }
 
 
