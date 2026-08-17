@@ -1,5 +1,8 @@
 # Results — 2026-03-18
 
+> **Exploratory.** These are PAXLUX-derived. Published results are intended to come from
+> PAXMIN instead — see `doc/data-sources.md`.
+
 > **Provenance uncertain.** These files predate provenance stamping. The date is the last
 > commit that touched them, not necessarily the date they were generated, and the exact
 > code version that produced them is not recorded. Treat the values as current but do not

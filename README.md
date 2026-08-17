@@ -9,11 +9,16 @@ two NHANES cycles, comparing people identified as having epilepsy against
 frequency-matched controls. See [doc/protocol.md](doc/protocol.md) for the full study
 rationale, aims and planned methods.
 
-**Status:** the primary light-exposure analysis is complete; rest–activity and sleep
-metrics are in progress. See [doc/good-practice-plan.md](doc/good-practice-plan.md) for
-outstanding work and [doc/analysis-log.md](doc/analysis-log.md) for the running record.
+**Status:** an exploratory light-exposure analysis is complete, based on the 1 Hz `PAXLUX`
+recordings. Published results are instead intended to come from **`PAXMIN`**, which
+carries minute-level light *and* activity for the same participants — sufficient
+resolution for circadian-scale work, and it allows light and activity to be compared on
+identical sampling. That analysis is in progress. See
+[doc/data-sources.md](doc/data-sources.md) for how the two light sources differ,
+[doc/good-practice-plan.md](doc/good-practice-plan.md) for outstanding work, and
+[doc/analysis-log.md](doc/analysis-log.md) for the running record.
 
-## Key findings so far
+## Findings so far (exploratory, PAXLUX)
 
 Comparing 192 PWE against 669 frequency-matched controls, adjusted for age, sex, PIR,
 education, season and cohort, PWE show **lower daytime light exposure** (`mean_daytime_lux`),
@@ -92,11 +97,11 @@ changes.
 | `02 - Finding PWE` | Identify people with epilepsy from prescription data |
 | `03 - Demographics of PWE` | Select frequency-matched controls |
 | `04 - Timezone confirmation` | Verify LUX timestamps are local clock time |
-| `05 - Cleaning LUX data` | Wear-time cleaning of LUX recordings (not yet written) |
+| `05 - Cleaning LUX data` | Wear-time cleaning of PAXLUX (superseded by the PAXMIN route) |
 | `06 - Testing metrics` | Develop and sanity-check the light metrics |
-| `07 - LUX analysis` | Run the full analysis (executed on HPC) |
-| `08 - LUX results` | Statistics and figures |
-| `09 - PAX cleaning` | Physical activity preprocessing (in progress) |
+| `07 - LUX analysis` | Run the full PAXLUX analysis (executed on HPC) |
+| `08 - LUX results` | Statistics and figures, PAXLUX — exploratory |
+| `09 - PAX cleaning` | PAXMIN light and activity preprocessing — the live work |
 
 The full analysis runs as a script rather than a notebook, since it processes several
 hundred participants:
@@ -138,15 +143,16 @@ data/           Raw and derived data (gitignored, not distributed)
 
 ## Known gaps
 
-- The preprocessing scripts are now committed (`scripts/`), but each still hard-codes its
-  cohort behind an "EDIT THIS" block, so the cycle G and H outputs cannot be shown to have
-  been produced identically. See `scripts/README.md`.
-- `interdaily_stability` mixes time resolutions, making IS values incomparable both with
-  published figures and between this project's own 5-minute and 1 Hz runs. See
-  [doc/analysis-log.md](doc/analysis-log.md).
+- The PAXMIN-based analysis, which is the one intended for publication, is still in
+  progress (notebook 09).
 - `PAXMIN_H` appears to have substantially more missing data than `PAXMIN_G`; whether
-  this is real or a conversion problem is unresolved.
-- A second, diverging clone of this repository exists on the W: drive.
+  this is real or a conversion problem is unresolved. This matters more now that PAXMIN
+  is the primary source.
+- PAXLUX-derived metrics are computed over the whole recording including non-wear time.
+  The PAXMIN route does not share this problem, as it masks non-wear.
+- The existing PAXLUX 5-minute files predate the parameterisation of the preprocessing
+  scripts, so cycle G and H cannot be *shown* to have been processed identically. Low
+  priority now that those results are exploratory.
 
 ## Licence
 

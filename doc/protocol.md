@@ -146,6 +146,7 @@ the descriptions to use when writing up methods.
 | Daytime 06:00–18:00 | 07:00–19:00 (night 20:00–05:00) | Not yet reconciled |
 | Thresholds >100 and >1,000 lux | >1,000 lux only | >100 lux not yet implemented |
 | Day–night light contrast | Not implemented | Outstanding |
+| Light from the dedicated 1 Hz recordings | **PAXMIN minute-level light** intended for publication; PAXLUX 1 Hz and 5-minute results are exploratory | PAXMIN carries light and activity in one table at a resolution ample for circadian work, so both can be compared on identical sampling, and it masks non-wear |
 | Sleep duration and fragmentation | Not implemented | Depends on the PAXMIN work in progress |
 | Mediation modelling | Confounder adjustment only | Outstanding |
 | UK Biobank replication | Not started | Exploratory aim |

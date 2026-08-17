@@ -13,8 +13,8 @@ domain. Raw files are **not** committed to this repository.
 | `DEMO` | Demographics | Age, sex, race, education, income, season |
 | `RXQ_RX` | Prescription medications | Identifying people with epilepsy |
 | `PAXHD` | Physical activity monitor header | Recording validity |
-| `PAXLUX` | Ambient light, 1 Hz | All light exposure metrics |
-| `PAXMIN` | Minute-level activity | Rest–activity metrics (in progress) |
+| `PAXLUX` | Ambient light, 1 Hz | Light metrics — exploratory, see below |
+| `PAXMIN` | Minute-level light **and** activity | Intended basis for published results |
 | `OCQ` | Occupation | Employment status |
 | `DPQ` | Depression screener (PHQ-9) | Depression status |
 | `DEQ` | Dermatology | Self-reported time outdoors |
@@ -91,6 +91,59 @@ covers 06:55:00–07:00:00. This shifts samples relative to the hour boundaries 
 night windows use, and differs between the 5-minute and 1 Hz analyses.
 
 See `scripts/README.md` for the full preprocessing pipeline and its known limitations.
+
+### Light and activity — `PAXMIN`
+
+**The intended basis for published results.** PAXMIN carries minute-level ambient light
+*and* physical activity for the same participants in one table, which is ample resolution
+for circadian-scale analysis and lets light and activity be compared on identical
+sampling. It also supersedes PAXLUX for light exposure — see *Two sources of light data*
+below.
+
+78,126,856 rows for cycle G, roughly 7,000 participants at one row per minute over 8 days.
+
+| Column | Meaning |
+|---|---|
+| `PAXLXMM` | Mean ambient light for the minute, lux |
+| `PAXLXSDM` | Standard deviation of light within the minute |
+| `PAXMTSM` | MIMS triaxial value — the activity measure |
+| `PAXAISMM` | MIMS accelerometer value |
+| `PAXMXM`, `PAXMYM`, `PAXMZM` | Per-axis MIMS values |
+| `PAXPREDM` | Predicted wear status; `3` denotes non-wear |
+| `PAXTSM` | Valid seconds contributing to the minute |
+| `PAXSSNMP` | Sample counter at 80 Hz; minute index is `PAXSSNMP / (60 * 80)` |
+| `PAXDAYM`, `PAXDAYWM` | Day number and day of week |
+| `PAXTRANM` | Transition indicator |
+| `PAXQFM`, `PAXFLGSM` | Quality flag and data flags |
+
+Non-wear is defined in notebook 09 as `PAXTSM < 45` or `PAXPREDM == 3`, and both activity
+and light are masked to missing over non-wear minutes. Wear blocks shorter than 1440
+minutes are discarded.
+
+### Two sources of light data
+
+The project has light exposure from two places, and they are not equivalent.
+
+| | `PAXLUX` | `PAXMIN` |
+|---|---|---|
+| Resolution | 1 Hz, plus a derived 5-minute downsample | 1 minute |
+| Activity in the same table | No | Yes |
+| Non-wear handling | Not applied; metrics span the whole recording | Masked by `PAXPREDM` / `PAXTSM` |
+| Preprocessing | Three R steps, cohort previously hard-coded | Read directly from the NHANES table |
+| Status | Exploratory | Intended for publication |
+
+The PAXLUX route came first. PAXMIN was found afterwards to carry light as well, at a
+resolution that is entirely sufficient here. Because PAXMIN light is already masked for
+non-wear, it also resolves the outstanding problem that PAXLUX-derived metrics are
+computed over non-wear time.
+
+Results in `results/` and the analysis in notebook 08 are all PAXLUX-derived and should be
+read as exploratory.
+
+The metric code in `lux_metrics.py` is source-agnostic: it takes a frame with `timestamp`
+and `mean_lux` columns, so it applies unchanged to PAXMIN light. One caveat carries over —
+`IS` resamples to hourly and so is comparable across resolutions, but `IV` is inherently
+resolution dependent, so minute-level IV will not match the 5-minute or 1 Hz figures.
 
 ### Employment — `OCQ`
 

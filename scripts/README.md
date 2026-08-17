@@ -6,6 +6,13 @@ The three R steps prepare the data; the Python step runs the analysis.
 Every step takes its cohort as an argument and resolves its own paths, so the same file
 serves both cohorts and nothing needs editing between runs.
 
+> **Scope note.** Steps 2–4 operate on the `PAXLUX` recordings, which are now expected to
+> be **exploratory rather than published**. `PAXMIN` carries minute-level light *and*
+> activity for the same participants, which is ample for circadian-scale analysis, so
+> published results are intended to come from there instead. Step 1 (`convert_xpt`)
+> remains on the critical path, since PAXMIN itself arrives as an `.xpt` file. See
+> `doc/data-sources.md`.
+
 ## Pipeline order
 
 | Step | Script | Does |
@@ -63,13 +70,14 @@ interval start instead.
 
 ## Still outstanding
 
-- **The existing 5-minute files predate this parameterisation.** They were produced by
-  editing a hard-coded cohort into the script, and the cycle G version of that file was
-  never saved, so G and H preprocessing still cannot be *shown* to have been identical.
-  Rerunning both cohorts through the current scripts would settle it.
 - **No manifest or checksums** for the raw inputs, so a partial download is undetectable.
-  Relevant to the open question about `PAXMIN_H` having more missing data than `PAXMIN_G`.
+  Now the most relevant of these, given the open question about `PAXMIN_H` having more
+  missing data than `PAXMIN_G` and PAXMIN being the primary source.
 - **The NHANES download itself is not scripted.**
+- **The existing 5-minute files predate this parameterisation.** They were produced by
+  editing a hard-coded cohort into the script, and the cycle G version was never saved,
+  so G and H preprocessing cannot be *shown* to have been identical. Rerunning both
+  cohorts would settle it, but this is low priority now those results are exploratory.
 
 ## Verification status
 

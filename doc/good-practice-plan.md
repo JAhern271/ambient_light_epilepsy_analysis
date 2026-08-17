@@ -8,9 +8,16 @@ the project to-do list.
 **Guiding test:** could someone else — or you in six months — clone this repository,
 read one page, and regenerate every number in the paper?
 
-Right now the answer is no, for three reasons: the analysis inputs are produced by
-code that is not in the repository, no result records which code version made it,
-and nothing checks that the metric functions are correct.
+When this plan was written the answer was no, for three reasons: the analysis inputs were
+produced by code that was not in the repository, no result recorded which code version
+made it, and nothing checked that the metric functions were correct. All three are now
+addressed.
+
+**Rescoped 2026-08-17.** PAXMIN carries minute-level light *and* activity for the same
+participants, at a resolution ample for circadian-scale analysis, so published results are
+intended to come from there rather than from the 1 Hz PAXLUX recordings. Work on the
+PAXLUX pipeline is preserved and reproducible but is now exploratory. Phase 4b below
+tracks the route that is actually headed for publication.
 
 ---
 
@@ -111,10 +118,11 @@ right.
 - [ ] **Decide which resolution is reported.** `IV` legitimately differs between 5-minute
       and 1 Hz, so the two results files are not interchangeable wholesale.
 
-## Phase 4 — Close the provenance gap (1–2 days, medium risk)
+## Phase 4 — Close the provenance gap
 
-**This is the most important phase scientifically.** The analysis currently starts from
-files nothing in the repository knows how to make.
+This was the most important phase scientifically: the analysis started from files nothing
+in the repository knew how to make. Passes one and two closed that. Pass three has since
+been rescoped around the move to PAXMIN.
 
 ### Pass one — recover and commit (DONE 2026-08-17)
 
@@ -153,19 +161,39 @@ Still unexercised: the Slurm submission path (the R was invoked directly), and
 
 ### Pass three — provenance of the raw inputs
 
-- [ ] **Rerun both cohorts through the parameterised scripts.** The existing 5-minute
-      files predate this work, so G and H still cannot be *shown* to have been processed
-      identically. This is what finally closes that gap.
-- [ ] **Reconcile the second clone** on the W: drive: 6 commits behind, with uncommitted
-      changes to `scripts/lux_analysis.py`.
+Rescoped 2026-08-17: PAXMIN is now the intended basis for publication, so the PAXLUX
+reprocessing items below dropped off the critical path. What remains matters *more*, since
+PAXMIN arrives as an `.xpt` and its integrity is now load-bearing.
+
+- [ ] **Write a manifest** of raw inputs with checksums, so a partial or corrupt download
+      is detectable. Now the highest-value item here: it would settle whether `PAXMIN_H`
+      genuinely has more missing data than `PAXMIN_G`, or was simply downloaded badly.
 - [ ] **Script the NHANES download** — fetch the `.xpt` files from the CDC, recording URLs
       and checksums.
-- [ ] **Write a manifest** of raw inputs with checksums, so corruption or a partial
-      download is detectable. This would settle the open question about the H cohort's
-      PAXMIN data.
-- [ ] **Decide on the binning alignment** — `center` is the default and what produced the
-      current files, but `start` may sit better with the hour-boundary day/night windows.
-      Now switchable via an argument.
+- [x] **Second clone on the W: drive reconciled** — its only uncommitted changes were
+      whitespace, and it now tracks `good-practice-restructure`.
+- [ ] ~~Rerun both cohorts through the parameterised scripts.~~ Deferred: only affects
+      PAXLUX-derived results, which are now exploratory.
+- [ ] ~~Decide on the binning alignment.~~ Deferred with the above; `center` versus `start`
+      only applies to PAXLUX downsampling, and is now switchable by argument anyway.
+
+## Phase 4b — the PAXMIN route
+
+The analysis actually headed for publication. Listed here so the plan reflects where the
+work is going, not where it has been.
+
+- [ ] **Promote the PAXMIN preprocessing out of notebook 09** into `src/`, where it can be
+      tested — non-wear detection, wear-block segmentation, and the masking of both
+      activity and light.
+- [ ] **Test it**, as was done for the light metrics. The same trap applies: a wrong wear
+      threshold produces plausible numbers rather than an error.
+- [ ] **Resolve the `PAXMIN_H` missing-data question** before building on it.
+- [ ] **Rerun the light metrics on PAXMIN light** (`PAXLXMM`). `lux_metrics.py` is
+      source-agnostic, so this needs no new metric code — but note `IV` is resolution
+      dependent, so minute-level values will not match the PAXLUX figures, while `IS`
+      will, since it resamples to hourly.
+- [ ] **Compare light against activity on identical sampling**, which is the reason for
+      the move to PAXMIN and what the secondary aims require.
 
 ## Phase 5 — Notebooks (half a day, low risk)
 
@@ -216,7 +244,8 @@ opened.
 | 1 | Documentation | Done, except the licence |
 | 2 | Repository hygiene | Done |
 | 3 | Testing | Done — but raised an open question about the IS definition |
-| 4 | Close the provenance gap | Passes one and two done; pass three reprocesses both cohorts |
+| 4 | Close the provenance gap | Passes one and two done; pass three rescoped to input checksums |
+| 4b | The PAXMIN route | Not started — the analysis headed for publication |
 | 5 | Notebooks | Not started — piecemeal |
 | 6 | Environment reproducibility | Not started |
 
