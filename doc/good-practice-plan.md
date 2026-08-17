@@ -126,26 +126,43 @@ files nothing in the repository knows how to make.
 - [x] **`scripts/README.md`** documenting pipeline order, how to submit, and the known
       problems left unfixed.
 
-### Pass two — parameterise
+### Pass two — parameterise (DONE 2026-08-17)
 
-- [ ] **Make the cohort an argument** in `convert_xpt.R`, `convert_paxlux.R` and
-      `downsample_lux.R`. All three hard-code cycle H behind an "EDIT THIS" banner, so the
-      G outputs were produced by a version of the file that no longer exists. Until this
-      is fixed, G and H preprocessing cannot be shown to have been identical.
-- [ ] **Remove the absolute RDS paths** from the `.R` and `.sh` files, deriving the
-      project root from the script location as the Python code now does.
-- [ ] **Reconcile `run_lux_analysis.sh`**, which activates a venv inside a second clone of
-      this repository on the W: drive and predates the Python script's command-line
-      interface.
+- [x] **Cohort is now an argument** to all three R scripts, with the submission scripts
+      passing it through (`sbatch downsample_lux.sh G`). `convert_xpt` also takes an
+      optional table list, and `downsample_lux` optional bin width and alignment.
+- [x] **Absolute RDS paths removed.** `scripts/lib/ale_paths.R` is the R counterpart of
+      `paths.py`: the `.sh` exports `ALE_PROJECT_ROOT` derived from its own location, and
+      `ALE_DATA_ROOT` overrides the data directory. Both directory layouts are handled.
+- [x] **`run_lux_analysis.sh` reconciled** — passes arguments through to the Python
+      command-line interface, resolves the venv from `ALE_VENV` or `<root>/venv`, and
+      fails with a clear message rather than silently using the wrong environment.
+- [x] **Job logs include the job id**, so concurrent or repeated runs no longer overwrite
+      each other's output.
+- [x] **Safety improvements**: `convert_xpt` skips existing parquet unless
+      `ALE_OVERWRITE=1`, every script prints its resolved paths before doing work, and
+      omitting the cohort prints usage instead of running against the wrong data.
+
+**Not yet verified by execution.** R is not installed on the Windows workstation, so the
+R changes were reviewed by inspection only; the shell scripts are syntax checked and
+their argument handling tested. Run one cohort of one step and check the printed paths
+before trusting a full rerun.
+
+### Pass three — provenance of the raw inputs
+
+- [ ] **Rerun both cohorts through the parameterised scripts.** The existing 5-minute
+      files predate this work, so G and H still cannot be *shown* to have been processed
+      identically. This is what finally closes that gap.
 - [ ] **Reconcile the second clone** on the W: drive: 6 commits behind, with uncommitted
       changes to `scripts/lux_analysis.py`.
 - [ ] **Script the NHANES download** — fetch the `.xpt` files from the CDC, recording URLs
-      and checksums. Still undocumented.
+      and checksums.
 - [ ] **Write a manifest** of raw inputs with checksums, so corruption or a partial
       download is detectable. This would settle the open question about the H cohort's
       PAXMIN data.
-- [ ] **Document the centre-aligned binning decision** in the methods, and check whether
-      it should be `start` rather than `center` given the hour-boundary windows.
+- [ ] **Decide on the binning alignment** — `center` is the default and what produced the
+      current files, but `start` may sit better with the hour-boundary day/night windows.
+      Now switchable via an argument.
 
 ## Phase 5 — Notebooks (half a day, low risk)
 
@@ -196,7 +213,7 @@ opened.
 | 1 | Documentation | Done, except the licence |
 | 2 | Repository hygiene | Done |
 | 3 | Testing | Done — but raised an open question about the IS definition |
-| 4 | Close the provenance gap | Pass one done — scripts recovered and committed; pass two parameterises them |
+| 4 | Close the provenance gap | Passes one and two done; pass three reprocesses both cohorts |
 | 5 | Notebooks | Not started — piecemeal |
 | 6 | Environment reproducibility | Not started |
 

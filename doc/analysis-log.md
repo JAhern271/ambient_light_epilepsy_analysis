@@ -19,6 +19,42 @@ Template:
 
 ---
 
+## 2026-08-17 — Preprocessing scripts parameterised
+
+**Ran:** No analysis. Rewrote the three R preprocessing steps and their Slurm submission
+scripts so the cohort is an argument rather than an edit, and added
+`scripts/lib/ale_paths.R` as the R counterpart of `paths.py`.
+
+```
+sbatch scripts/downsample_lux/downsample_lux.sh G
+sbatch scripts/downsample_lux/downsample_lux.sh H 1 start
+sbatch scripts/convert_xpt/convert_xpt.sh H PAXMIN
+```
+
+**Why it matters:** the cohort was previously hard-coded behind an "EDIT THIS" banner, so
+running the other cohort meant editing the file, and the cycle G version was never saved.
+That is why G and H preprocessing cannot currently be shown to have been identical. The
+scripts can now process either cohort without modification, and echo their resolved paths
+and settings into the job log.
+
+Also: absolute RDS paths removed in favour of `ALE_PROJECT_ROOT` / `ALE_DATA_ROOT`;
+`run_lux_analysis.sh` now passes arguments to the Python command-line interface and fails
+loudly if the venv is missing rather than silently using the wrong one; job logs carry the
+job id so reruns do not overwrite each other; `convert_xpt` skips existing parquet unless
+`ALE_OVERWRITE=1`.
+
+**Verification.** The shell scripts are syntax checked and their argument handling tested,
+including the missing-argument case. **The R was not executed** — R is not installed on
+the Windows workstation — so it was reviewed by inspection only. Two bugs were caught that
+way: `ale_lux_dir` rejected any bin width other than 5 minutes, and `ALE_OVERWRITE=0`
+would have counted as true.
+
+**Next:** run one cohort of one step on BlueBEAR and check the printed paths before
+trusting a full rerun. Reprocessing both cohorts through these scripts is what finally
+closes the G/H provenance gap.
+
+---
+
 ## 2026-08-17 — Notebook 08 regenerated against corrected IS
 
 **Ran:** Built `results/2026-08-17/lux_1hz_fmatch_analysis.csv` by replacing only the IS

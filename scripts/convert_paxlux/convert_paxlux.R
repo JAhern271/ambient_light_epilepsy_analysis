@@ -1,15 +1,46 @@
 #!/usr/bin/env Rscript
+#
+# Convert the per-participant light CSVs into 1 Hz parquet files.
+#
+#   Rscript convert_paxlux.R <cohort>
+#
+# e.g. Rscript convert_paxlux.R G
+#
+# The cohort used to be hard-coded, so the two cohorts were produced by
+# different versions of this file. It is now an argument.
+#
+# Participants whose output already exists are skipped, so the job can be
+# resubmitted after a timeout without redoing completed work.
 
-cat("Loading R libaries...")
+args <- commandArgs(trailingOnly = TRUE)
+
+if (length(args) < 1) {
+  stop("Usage: Rscript convert_paxlux.R <cohort>")
+}
+
+COHORT <- args[1]
+
+.file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
+.script_dir <- dirname(normalizePath(sub("^--file=", "", .file_arg[1])))
+source(file.path(dirname(.script_dir), "lib", "ale_paths.R"))
+
+ale_check_cohort(COHORT)
+
+raw_dir <- ale_lux_dir(COHORT, "extracted")
+out_dir <- ale_lux_dir(COHORT, "parquet")
+
+cat("Loading R libraries...\n")
 
 library(arrow)
 library(data.table)
 
-cat("Loading csv files...")
+ale_report_paths(COHORT)
+cat("Input dir   :", raw_dir, "\n")
+cat("Output dir  :", out_dir, "\n\n")
 
-# ---- paths ----
-raw_dir <- "/rds/projects/t/terryjr-fellowship-ahern/projects/ambient_light_epilepsy_analysis/data/PAXLUX_H/extracted"
-out_dir <- "/rds/projects/t/terryjr-fellowship-ahern/projects/ambient_light_epilepsy_analysis/data/PAXLUX_H/parquet"
+if (!dir.exists(raw_dir)) {
+  stop("Input directory does not exist: ", raw_dir)
+}
 
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -21,6 +52,9 @@ csv_files <- list.files(
 )
 
 cat("Found", length(csv_files), "CSV files\n")
+if (length(csv_files) == 0) {
+  stop("No _Lux.csv files found in ", raw_dir)
+}
 
 # ---- loop over participants ----
 for (csv in csv_files) {
@@ -57,4 +91,4 @@ for (csv in csv_files) {
   gc()
 }
 
-cat("Done.\n")
+cat("Done for cohort", COHORT, ".\n")
