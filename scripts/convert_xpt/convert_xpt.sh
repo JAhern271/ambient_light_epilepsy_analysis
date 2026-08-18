@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=xpt_to_parquet
-#SBATCH --time=02:00:00
-#SBATCH --mem=64G
+#SBATCH --time=04:00:00
+#SBATCH --mem=128G
 #SBATCH --cpus-per-task=1
 #SBATCH --output=convert_xpt_%j.out
 #SBATCH --error=convert_xpt_%j.err
