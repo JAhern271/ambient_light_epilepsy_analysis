@@ -8,15 +8,29 @@
 #
 # Convert raw NHANES .xpt tables to parquet.
 #
-#   sbatch convert_xpt.sh G              # all standard tables
-#   sbatch convert_xpt.sh H PAXMIN       # just one
+#   sbatch convert_xpt.sh G                          # all standard tables
+#   sbatch convert_xpt.sh H PAXMIN                   # just one
+#   sbatch convert_xpt.sh H PAXMIN --overwrite       # replace existing parquet
 #
-# Set ALE_OVERWRITE=1 to replace parquet files that already exist.
+# Pass --overwrite to replace parquet files that already exist. A bare
+# ALE_OVERWRITE=1 in front of sbatch does NOT work: Slurm does not pass the
+# submitting environment into the job here.
 
 set -euo pipefail
 
-COHORT="${1:?Usage: sbatch convert_xpt.sh <cohort> [table ...]}"
+COHORT="${1:?Usage: sbatch convert_xpt.sh <cohort> [table ...] [--overwrite]}"
 shift
+
+# Collect table names, picking out --overwrite. Setting the variable here means
+# it is inherited by Rscript as a child process, which is reliable, unlike
+# relying on Slurm to carry it in from the submitting shell.
+TABLES=()
+for arg in "$@"; do
+    case "$arg" in
+        --overwrite) export ALE_OVERWRITE=1 ;;
+        *)           TABLES+=("$arg") ;;
+    esac
+done
 
 # Slurm copies this script into a spool directory before running it, so
 # BASH_SOURCE points somewhere useless under sbatch. SLURM_SUBMIT_DIR is the
@@ -39,4 +53,4 @@ module load bear-apps/2024a
 module load R/4.5.0-gfbf-2024a
 module load arrow-R/17.0.0.1-foss-2024a-R-4.5.0
 
-Rscript "${R_SCRIPT}" "${COHORT}" "$@"
+Rscript "${R_SCRIPT}" "${COHORT}" ${TABLES[@]+"${TABLES[@]}"}
