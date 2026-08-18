@@ -187,7 +187,7 @@ work is going, not where it has been.
       activity and light.
 - [ ] **Test it**, as was done for the light metrics. The same trap applies: a wrong wear
       threshold produces plausible numbers rather than an error.
-- [ ] **Resolve the `PAXMIN_H` missing-data question** before building on it.
+- [x] **`PAXMIN_H` question resolved 2026-08-18: the file is truncated and zero-padded**, holding 2,489 of 7,776 participants. A conversion fault, not real missing data. Needs reconverting before any cycle H PAXMIN result. See [analysis-log.md](analysis-log.md).
 - [ ] **Rerun the light metrics on PAXMIN light** (`PAXLXMM`). `lux_metrics.py` is
       source-agnostic, so this needs no new metric code — but note `IV` is resolution
       dependent, so minute-level values will not match the PAXLUX figures, while `IS`

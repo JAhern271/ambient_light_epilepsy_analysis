@@ -19,6 +19,54 @@ Template:
 
 ---
 
+## 2026-08-18 — PAXMIN_H is truncated: a conversion fault, not missing data
+
+**Ran:** Investigated the long-standing question of whether cycle H genuinely has more
+missing accelerometry than cycle G. It does not. `PAXMIN_H.parquet` is **truncated and
+zero-padded**.
+
+| | PAXMIN_G | PAXMIN_H |
+|---|---|---|
+| Source `.xpt` | 7.6 GB | **8.7 GB** |
+| Converted parquet | 913 MB | **306 MB** |
+| Rows | 78,126,856 | 88,223,479 |
+| Padding rows (SEQN = 0) | 0 | **60,030,661 (68%)** |
+| Participants present | 6,917 of 6,917 | **2,489 of 7,776** |
+| SEQN range | 62161–71916 (complete) | 73557–**76872**, should reach 83731 |
+
+The source `.xpt` is *larger* than G's, so the data was downloaded. The parquet holds the
+first 2,489 participants and then ~60 million rows of `SEQN = 0` with every value zero.
+Row groups 0–26 are ~11 MB each; groups 27–84 are 0 MB.
+
+**Impact on the cohort:** only **40 of 110 cases** and **130 of 393 controls** for cycle H
+are present. Any cycle H analysis built on PAXMIN today silently uses a third of the
+intended sample, biased toward low SEQN.
+
+**Why nothing caught it.** The file opens cleanly, has no nulls, and has a *higher* row
+count than G — padding makes a truncated file look bigger, not smaller. Every cheap sanity
+check passes. Only participant coverage reveals it.
+
+**Fix:** reconvert from the `.xpt`, which the parameterised script now supports:
+
+```
+ALE_OVERWRITE=1 sbatch scripts/convert_xpt/convert_xpt.sh H PAXMIN
+```
+
+Worth raising the job's memory and walltime first: at 8.7 GB this is the largest table in
+the project, and a silent truncation is consistent with the conversion being cut short.
+Rerun `scripts/check_data_integrity.py` afterwards to confirm.
+
+**Guarded against recurrence:** added `ambient_light_epilepsy.integrity` and
+`scripts/check_data_integrity.py`, which compare the participants actually present against
+those PAXHD says should be there, and exit non-zero on a mismatch. Five tests cover the
+failure mode, including the case where a padded file has more rows but fewer participants
+than a good one.
+
+**Blocks:** the rest of Phase 4b. Promoting notebook 09's preprocessing can proceed on
+cycle G, but no cycle H result should be produced until this is reconverted.
+
+---
+
 ## 2026-08-17 — Cohort definition promoted out of notebook 03
 
 **Ran:** Moved the frequency-matching logic from notebook 03 into
