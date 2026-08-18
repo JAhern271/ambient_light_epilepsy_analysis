@@ -22,8 +22,20 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export ALE_PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# Slurm copies this script into a spool directory before running it, so
+# BASH_SOURCE points somewhere useless under sbatch. SLURM_SUBMIT_DIR is the
+# directory the job was submitted from, which is the repository root.
+PROJECT_ROOT="${ALE_PROJECT_ROOT:-${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}"
+export ALE_PROJECT_ROOT="$PROJECT_ROOT"
+
+PY_SCRIPT="${PROJECT_ROOT}/scripts/lux_analysis.py"
+if [[ ! -f "${PY_SCRIPT}" ]]; then
+    echo "Cannot find ${PY_SCRIPT}" >&2
+    echo "Submit from the repository root:" >&2
+    echo "    cd <repo> && sbatch scripts/run_lux_analysis.sh" >&2
+    echo "Or set ALE_PROJECT_ROOT to the repository root." >&2
+    exit 1
+fi
 
 module purge
 module load bluebear
@@ -41,4 +53,4 @@ fi
 source "${VENV}/bin/activate"
 
 cd "${ALE_PROJECT_ROOT}"
-python scripts/lux_analysis.py "$@"
+python "${PY_SCRIPT}" "$@"
