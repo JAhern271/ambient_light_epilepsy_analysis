@@ -152,11 +152,12 @@ data/           Raw and derived data (gitignored, not distributed)
 
 - The PAXMIN-based analysis, which is the one intended for publication, is still in
   progress (notebook 09).
-- **`PAXMIN_H` is truncated and must be reconverted before any cycle H result.** It holds
-  2,489 of 7,776 participants, the rest replaced by 60 million zero rows, so only 40 of
-  110 cases and 130 of 393 controls are present. A conversion fault, not real missing
-  data — the source `.xpt` is intact. Run `python scripts/check_data_integrity.py` to
-  confirm the state at any time.
+- **`PAXMIN_H.xpt` is an incomplete download and must be re-fetched from the CDC.** The
+  file is full-size at 9.35 GB but only its first 2.99 GB carry data; the rest is zeros,
+  so only 2,489 of 7,776 participants are present, and with them 40 of 110 cases and 130
+  of 393 controls. Reconverting cannot help — the data is not in the file. Cycle G is
+  complete. Run `python scripts/check_data_integrity.py` to check both the source `.xpt`
+  and the converted parquet.
 - PAXLUX-derived metrics are computed over the whole recording including non-wear time.
   The PAXMIN route does not share this problem, as it masks non-wear.
 - The existing PAXLUX 5-minute files predate the parameterisation of the preprocessing

@@ -29,6 +29,20 @@ def parse_args():
 
 def check(year, base_path):
     print(f"\n=== PAXMIN_{year} ===")
+
+    # Check the source first: if the .xpt is short, no amount of reconverting
+    # will help, and the parquet findings below are a consequence not a cause.
+    source_ok = True
+    xpt = paths.raw_table(year, "PAXMIN", base_path).with_suffix(".xpt")
+    if xpt.exists():
+        src = integrity.check_xpt(xpt)
+        print(f"  source .xpt          : {src['records']:,} records,"
+              f" {src['real_records']:,} carrying data")
+        for problem in src["problems"]:
+            print(f"  PROBLEM (source)     : {problem}")
+            source_ok = False
+    else:
+        print(f"  source .xpt          : not present at {xpt}")
     result = integrity.check_paxmin(year, base_path)
 
     print(f"  rows                 : {result['rows']:,}")
@@ -48,6 +62,15 @@ def check(year, base_path):
     if result["problems"]:
         for problem in result["problems"]:
             print(f"  PROBLEM: {problem}")
+
+    if not source_ok:
+        print("  -> The source download is incomplete. Re-download the .xpt;")
+        print("     reconverting cannot recover data the file does not contain.")
+        return False
+
+    if result["problems"]:
+        print("  -> The source looks complete, so reconvert:")
+        print(f"     sbatch scripts/convert_xpt/convert_xpt.sh {year} PAXMIN --overwrite")
         return False
 
     print("  OK")
@@ -62,9 +85,8 @@ def main():
     ok = all([check(year, args.base_path) for year in cohorts])
 
     if not ok:
-        print("\nOne or more tables are incomplete.")
-        print("Reconvert from the .xpt with:")
-        print("    ALE_OVERWRITE=1 sbatch scripts/convert_xpt/convert_xpt.sh <cohort> PAXMIN")
+        print("")
+        print("One or more tables are incomplete; see the guidance above.")
         sys.exit(1)
 
     print("\nAll checked tables look complete.")

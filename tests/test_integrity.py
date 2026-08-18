@@ -94,3 +94,65 @@ def test_cohort_availability_splits_present_from_missing(tmp_path, monkeypatch):
 
     assert found["present"] == [101, 102]
     assert found["missing"] == [999]
+
+
+# ---------------------------------------------------------------------------
+# Checking the raw .xpt
+# ---------------------------------------------------------------------------
+
+def write_xpt(path, n_records, real_records, record_length=8):
+    """
+    A minimal XPT-shaped file: enough header for the layout parser, then
+    `n_records` records of which only the first `real_records` carry data.
+    Mimics an interrupted download that preallocated its full length.
+    """
+    header = bytearray()
+    namestr = b"HEADER RECORD*******NAMESTR HEADER RECORD"
+    header += namestr.ljust(54, b"!") + b"0001" + b"0" * 22
+    header = header[:54] + b"0001" + b"0" * (80 - 58)
+    header = bytearray(namestr.ljust(54, b"!")) + b"0001" + b"0" * 22
+
+    # one NAMESTR: length lives in the big-endian short at offset 4
+    field = bytearray(140)
+    field[4:6] = record_length.to_bytes(2, "big")
+    field[8:16] = b"SEQN    "
+
+    obs = b"HEADER RECORD*******OBS     HEADER RECORD".ljust(80, b"!")
+
+    body = b"".join(
+        (b"\x41" + b"\x10" * (record_length - 1)) if i < real_records
+        else b"\x00" * record_length
+        for i in range(n_records)
+    )
+
+    path.write_bytes(bytes(header) + bytes(field) + obs + body)
+    return path
+
+
+def test_complete_xpt_reports_no_problems(tmp_path):
+    path = write_xpt(tmp_path / "good.xpt", n_records=500, real_records=500)
+
+    result = integrity.check_xpt(path, sample_records=100)
+
+    assert result["problems"] == []
+    assert result["real_records"] == 500
+
+
+def test_zero_filled_xpt_is_detected(tmp_path):
+    """The PAXMIN_H failure: full-length file, only the first third real."""
+    path = write_xpt(tmp_path / "truncated.xpt", n_records=900, real_records=300)
+
+    result = integrity.check_xpt(path, sample_records=100)
+
+    assert result["problems"], "a zero-filled tail should be reported"
+    assert result["real_records"] == 300
+    assert "did not complete" in result["problems"][0]
+
+
+def test_xpt_layout_reads_the_record_length(tmp_path):
+    path = write_xpt(tmp_path / "layout.xpt", n_records=10, real_records=10, record_length=16)
+
+    layout = integrity.xpt_layout(path)
+
+    assert layout["record_length"] == 16
+    assert layout["records"] == 10

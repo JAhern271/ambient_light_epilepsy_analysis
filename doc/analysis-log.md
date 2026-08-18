@@ -19,6 +19,51 @@ Template:
 
 ---
 
+## 2026-08-18 — Correction: PAXMIN_H is a bad download, not a bad conversion
+
+**Supersedes the entry below.** That entry concluded the source `.xpt` was intact and the
+conversion had truncated it. That was wrong, and the reconversion it recommended produced
+a byte-for-byte identical file, which is what prompted a closer look.
+
+**Ran:** Reconverted `PAXMIN_H` on BlueBEAR with the raised limits (128 GB, 4 h) and
+`--overwrite`. Output was identical to the byte: 306,458,512 bytes, same 2,489
+participants, same cut at SEQN 76872. Deterministic, so not a resource limit.
+
+Parsed the `.xpt` headers directly and seeked into the file rather than trusting any
+reader:
+
+| | PAXMIN_G.xpt | PAXMIN_H.xpt |
+|---|---|---|
+| File size | 8,125,196,000 | 9,351,691,760 |
+| Record length | 104 bytes | 106 bytes |
+| Records the file spans | 78,126,856 | 88,223,479 |
+| Records actually carrying data | 78,126,856 | **28,192,818 (32%)** |
+| Last record's SEQN | 71,916 | **0** |
+| Final 1,000 records | 72% zero bytes (normal) | **100% zero bytes** |
+
+**Found:** `PAXMIN_H.xpt` is zero-filled from byte 2,988,441,668 onward. The file is the
+right length but two thirds of it is empty. That is the signature of a transfer that
+preallocated its final size and then stopped. R read it perfectly; there was nothing else
+to read.
+
+The row count reported by any reader is derived from file *length*, not content, so the
+file presents as a valid XPT of 88.2 million rows. Nothing short of inspecting the bytes
+would reveal it.
+
+**Fix:** re-download `PAXMIN_H.xpt` from the CDC. No conversion change is needed; the
+converter has been correct throughout.
+
+**Guard added:** `integrity.check_xpt` parses the XPT header for the record layout, then
+checks whether the tail is zero-filled and binary-searches for the last record carrying
+data. `scripts/check_data_integrity.py` now checks the source before the parquet, and says
+which of the two is at fault, since the parquet symptoms are identical either way.
+
+**Also noted:** verifying against cycle G matters here. G's final records are 72% zero
+*bytes* — normal, since much of the data is genuinely zero — while H's are 100%. Without
+G as a control, "lots of zeros" would have been an ambiguous signal.
+
+---
+
 ## 2026-08-18 — PAXMIN_H is truncated: a conversion fault, not missing data
 
 **Ran:** Investigated the long-standing question of whether cycle H genuinely has more

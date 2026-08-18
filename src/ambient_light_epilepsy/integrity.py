@@ -11,6 +11,8 @@ These functions return findings rather than printing them, so they can be
 tested and called from a script.
 """
 
+import struct
+
 import numpy as np
 import pyarrow.parquet as pq
 
@@ -101,3 +103,87 @@ def cohort_availability(year, seqns, base_path=None):
     missing = [s for s in seqns if float(s) not in coverage["seqns"]]
 
     return {"present": present, "missing": missing}
+
+
+# ---------------------------------------------------------------------------
+# Checking the raw .xpt, before conversion
+# ---------------------------------------------------------------------------
+#
+# PAXMIN_H arrived as a full-size 9.35 GB file whose last 6.4 GB were zeros:
+# an interrupted download that had preallocated its full length. Every check on
+# the converted parquet reported the same fault, but none could say whether the
+# cause was the conversion or the source. Checking the .xpt settles that.
+
+
+def xpt_layout(path):
+    """Record length and count for an XPT file, read from its header."""
+    with open(path, "rb") as handle:
+        head = handle.read(20000)
+        handle.seek(0, 2)
+        size = handle.tell()
+
+    marker = head.find(b"HEADER RECORD*******NAMESTR HEADER RECORD")
+    if marker < 0:
+        raise ValueError(f"Not an XPT file, or an unexpected layout: {path}")
+
+    n_vars = int(head[marker + 54:marker + 58])
+    start = marker + 80
+    record_length = sum(
+        struct.unpack(">h", head[start + v * 140 + 4:start + v * 140 + 6])[0]
+        for v in range(n_vars)
+    )
+
+    data_start = head.find(b"HEADER RECORD*******OBS     HEADER RECORD") + 80
+
+    return {
+        "size": size,
+        "variables": n_vars,
+        "record_length": record_length,
+        "data_start": data_start,
+        "records": (size - data_start) // record_length,
+    }
+
+
+def check_xpt(path, sample_records=1000):
+    """
+    Look for the zero padding left by an interrupted download.
+
+    A truncated transfer that preallocated its final size leaves a file of
+    exactly the right length whose tail is zeros. That reads as a valid XPT of
+    the full row count, so only the content gives it away.
+    """
+    layout = xpt_layout(path)
+    problems = []
+
+    with open(path, "rb") as handle:
+        offset = layout["data_start"] + (layout["records"] - sample_records) * layout["record_length"]
+        handle.seek(max(offset, layout["data_start"]))
+        tail = handle.read(sample_records * layout["record_length"])
+
+    zero_fraction = tail.count(0) / len(tail) if tail else 1.0
+
+    if zero_fraction == 1.0:
+        # Binary search for the last record carrying any data
+        with open(path, "rb") as handle:
+            low, high = 0, layout["records"]
+            while low < high:
+                mid = (low + high) // 2
+                handle.seek(layout["data_start"] + mid * layout["record_length"])
+                if any(handle.read(layout["record_length"])):
+                    low = mid + 1
+                else:
+                    high = mid
+        layout["real_records"] = low
+        share = 100 * low / layout["records"]
+        problems.append(
+            f"file is zero-filled after record {low:,} of {layout['records']:,} "
+            f"({share:.0f}% real) - the download did not complete"
+        )
+    else:
+        layout["real_records"] = layout["records"]
+
+    layout["tail_zero_fraction"] = zero_fraction
+    layout["problems"] = problems
+    layout["path"] = str(path)
+
+    return layout
