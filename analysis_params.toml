@@ -1,0 +1,92 @@
+# Analysis parameters for the ambient light / epilepsy study.
+#
+# This file is the SINGLE SOURCE for every analysis parameter. doc/methods.md
+# references these keys by name rather than restating their values, so a number
+# exists in exactly one place. Three different night windows once existed across
+# two documents and one call site; that is what this file prevents.
+#
+# Distinct from config.toml, which holds machine-specific data paths. Nothing
+# here varies by machine, so this file is committed and identical everywhere.
+#
+# Changing a value here changes the analysis. Do it deliberately, record the
+# decision in doc/analysis-log.md, and never change one after outcomes have been
+# examined — the pre-specification in doc/methods.md is what licenses the
+# analysis.
+#
+# WIRING STATUS 2026-08-27: the code does not yet read this file. Values below
+# are the specification; several call sites still carry contradicting literals.
+# Migration is tracked in doc/implementation-status.md. Until that is closed,
+# treat this file as normative and the literals as bugs.
+
+[cohort]
+# doc/methods.md 4.1, 4.3, 4.5
+primary_cycle = "H"           # 2013-2014; the only cycle with reason-for-use codes
+replication_cycle = "G"       # 2011-2012; broad definition only, reported separately
+min_age = 20
+case_definition = "primary"   # primary | narrow | broad -- see methods.md 4.1
+icd10_prefix = "G40"          # epilepsy and recurrent seizures
+
+# Selection is CODE-FIRST: take everyone with icd10_prefix in RXDRSC1-3, then
+# confirm the drug is an ASM. The name lists below are for confirmation and for
+# the narrow/broad definitions -- never as the primary selector.
+asm_confirm = [
+    "phenytoin", "carbamazepine", "valproic acid", "divalproex sodium",
+    "phenobarbital", "primidone", "ethosuximide", "levetiracetam",
+    "lamotrigine", "topiramate", "oxcarbazepine", "zonisamide",
+    "lacosamide", "clobazam", "clonazepam", "lorazepam", "diazepam",
+    "gabapentin", "pregabalin",
+]
+# Rarely used off-label; the narrow definition (methods.md 4.1, sensitivity 2)
+asm_narrow = ["levetiracetam", "phenytoin", "carbamazepine", "lacosamide"]
+# The 12-name list behind the superseded results. Broad definition only.
+asm_broad = [
+    "phenytoin", "carbamazepine", "valproic acid", "divalproex sodium",
+    "phenobarbital", "primidone", "ethosuximide", "levetiracetam",
+    "lamotrigine", "topiramate", "oxcarbazepine", "zonisamide",
+]
+
+[validity]
+# doc/methods.md 5.1, 5.2
+min_valid_days = 4            # sensitivity: 5 (Johnson 2023), 3 (Su 2022)
+min_wear_hours = 20           # per valid day; sensitivity: 16 (Su 2022)
+day_boundary_hour = 12        # noon-to-noon days, so a night falls in one day
+drop_partial_first_last = true
+nonwear_pred_code = 3         # PAXPREDM: predicted non-wear
+min_valid_seconds = 45        # PAXTSM below this -> minute is non-wear
+exclude_quality_flagged = true    # PAXQFM any letter value
+uncomputable_mims = -0.01     # PAXMTSM sentinel for uncomputable
+
+[light]
+# doc/methods.md 6.1, 6.2, 6.3, 6.4
+day_window = [7, 19]          # 07:00-19:00 inclusive of start, exclusive of end
+night_window = [23, 6]        # 23:00-06:00, wraps midnight
+# 19:00-23:00 and 06:00-07:00 are excluded from both, not assigned to either.
+day_thresholds = [100, 250, 1000]   # lux; minutes per day above each
+primary_day_threshold = 1000  # designated primary endpoint BEFORE analysis
+sensor_ceiling = 2500         # top-coded by the device; see methods.md 6.2
+night_categories = 3          # none / low / high, split at median among exposed
+iv_transform = "both"         # raw | log | both -- report both, methods.md 6.4
+
+[sleep]
+# doc/methods.md 6.6 -- secondary outcome family
+algorithm = "ggir_vanhees"    # ggir_vanhees | thapa_chhetry | hmm
+min_plausible_hours = 3
+max_plausible_hours = 13
+
+[matching]
+# doc/methods.md 4.2, 8.1
+method = "full"               # MatchIt method="full"; sensitivity: overlap, 4:1 caliper
+variables = ["age", "sex", "race", "PIR", "education", "employment", "season"]
+balance_smd_threshold = 0.1
+seed = 42
+
+[survey]
+# doc/methods.md 8.5 -- supplementary analysis only
+weight = "WTMEC2YR"
+halve_weight = false          # true ONLY for a pooled 4-year sample; H alone is 2-year
+strata = "SDMVSTRA"
+psu = "SDMVPSU"
+
+[multiplicity]
+# doc/methods.md 8.6
+correction = "fdr"

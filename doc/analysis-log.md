@@ -23,6 +23,55 @@ Template:
 
 ---
 
+## 2026-08-27 — Cycle G has no reason-for-use codes; study rescoped to cycle H
+
+**Ran:** Compared candidate epilepsy case definitions in `RXQ_RX`, both cycles, on this
+PC. Counted unique SEQN under each definition, then applied age ≥ 20 and the
+accelerometry validity filters.
+
+**Found: `RXQ_RX_G` contains no reason-for-use variables at all.** Cycle H carries
+`RXDRSC1–3` and `RXDRSD1–3`; cycle G carries neither. Confirmed against the parquet on
+both the local copy and the W: drive, and against the CDC codebook for RXQ_RX_G, which
+documents seven variables and no reason-for-use fields. This is a property of the CDC
+release, not of our conversion. Consistent with the literature: Tang 2024 used 2013–2014
+and Terman 2020 used 2013–2016, both avoiding cycle G.
+
+**The G40 requirement is therefore implementable in cycle H only.**
+
+| Definition | Cycle | Identified | Age ≥ 20 | + valid recording |
+|---|---|---|---|---|
+| Any drug + G40, ASM confirmed | H | 72 | 56 | 46 |
+| ASM name-list + G40 | H | 61 | 47 | 39 |
+| ASM name-list only (current code) | H | 157 | 136 | 115 |
+| ASM name-list only (current code) | G | 123 | 101 | 87 |
+
+**The current case definition has a PPV of 38.9% against G40** (61 of 157 in cycle H). The
+96 discordant cases are taking topiramate for migraine (`G43` ×26) and divalproex or
+lamotrigine for mood disorders (`F31.9` ×23, `F39` ×19, `F32.9` ×15) — the off-label
+pattern the literature predicts. The name list also *misses* genuine cases: lacosamide,
+clobazam, and clonazepam/lorazepam/diazepam all appear with G40 codes, which is why
+selection must be code-first rather than drug-first.
+
+**This supersedes the existing results.** The 192-case pooled cohort behind everything in
+`results/` is roughly 60% off-label ASM use. Those numbers are not exploratory-but-valid;
+they are measuring the wrong group. The 123 and "22 of 123 under 20" figures in the old
+protocol were cycle G alone, and 87 + 115 = 202 minus incomplete covariates gives the 192.
+
+**Decision:** cycle H only for the primary analysis, code-first G40 + ASM confirmation.
+Cycle G retained as a labelled broad-definition replication cohort, reported separately,
+with attenuation toward the null expected and quantified by the measured PPV. If cycle G
+shows an effect of *similar* magnitude to H, that is evidence against an
+epilepsy-specific interpretation — pre-specified in methods.md §4.5 so that neither
+outcome can be read as confirmatory after the fact.
+
+**Next:** the PPV estimate is worth reporting in its own right — no NHANES-specific study
+has quantified misclassification from ASM-based epilepsy ascertainment, a gap the
+literature scan identified. Rewrite `cohort.find_people_on_asm` as code-first with a
+`definition=` parameter. `PAXMIN_H` is now on the critical path for the whole primary
+analysis, not just for cycle H.
+
+---
+
 ## 2026-08-27 — The CDC throttles per connection; download scripted
 
 **Ran:** A second manual re-download of `PAXMIN_H.xpt` failed worse than the first: 39,541

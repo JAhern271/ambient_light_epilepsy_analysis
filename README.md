@@ -20,6 +20,15 @@ identical sampling. That analysis is in progress. See
 
 ## Findings so far (exploratory, PAXLUX)
 
+> **SUPERSEDED 2026-08-27 — do not cite.** The 192-case cohort below was defined by ASM
+> drug name with no reason-for-use requirement, and has a positive predictive value of
+> **38.9%** against an ICD-10 G40 indication: roughly three in five of these participants
+> are taking an ASM for migraine or a mood disorder, not for epilepsy. The results are also
+> computed under a night window and a clock-time convention that the specification has
+> since changed. They are measuring the wrong group, not measuring the right group
+> imprecisely. See [doc/analysis-log.md](doc/analysis-log.md) and
+> [doc/methods.md](doc/methods.md) §4.1. Retained here pending a rewrite of this section.
+
 Comparing 192 PWE against 669 frequency-matched controls, adjusted for age, sex, PIR,
 education, season and cohort, PWE show **lower daytime light exposure** (`mean_daytime_lux`),
 **less time above 1000 lux**, **lower M10** and **lower interdaily stability**. Nighttime

@@ -1,4 +1,4 @@
-# Ambient light exposure and rest–activity rhythm disruption in people with epilepsy: NHANES
+# Ambient light exposure and rest–activity rhythm disruption in people with epilepsy: NHANES 2013–2014, with a 2011–2012 replication cohort
 
 > **Status:** normative specification for this study. If the code disagrees with this
 > document, the code is wrong — that gap is tracked in
@@ -6,10 +6,17 @@
 > to match the code.
 >
 > **Revised:** 2026-08-27. **Supersedes:** [archive/protocol-original.md](archive/protocol-original.md).
-> **Revision in progress:** scope is being narrowed to cycle H; see
-> [implementation-status.md](implementation-status.md) for what still refers to the pooled design.
 >
-> Citation confidence is flagged throughout; see §11.
+> Analysis parameters — window boundaries, thresholds, validity criteria — are held in
+> `analysis_params.toml` and referenced here by name rather than restated, so that a value
+> exists in exactly one place. Citation confidence is flagged throughout; see §11.
+
+## Revision history
+
+| Date | Change |
+|---|---|
+| 2026-08-27 | Scope narrowed to cycle H for the primary analysis, after `RXQ_RX_G` was found to carry no reason-for-use variables (§4.1). Cycle G becomes a labelled broad-definition replication cohort (§4.5). Case ascertainment restructured as code-first. Yield and power restated on measured counts (§4.1, §7). Sleep derivation contradiction between §6.6 and §9 resolved in favour of GGIR. Software split between Python and R (§9). Parameter values moved to `analysis_params.toml`. |
+| 2026-08-20 | First complete draft. |
 
 ---
 
@@ -50,13 +57,13 @@ The novel contribution here is the light channel in epilepsy specifically.
 
 **Framing note.** H1–H3 concern the *dose and regularity* of the light environment — how much light, when, and how consistently. This is deliberately distinct from *alignment* between light and activity cycles [Xiao_2023; Miller_2010]. Alignment measures are largely insensitive to absolute light level: a person who is chronically under-lit but on a consistent schedule scores as well-aligned. Since the mechanism motivating this study is insufficient zeitgeber strength [Skeldon_2022], dose is the construct of interest, and alignment measures would be blind to the effect we hypothesise. Alignment is retained only as a sensitivity analysis (§8.4).
 
-**Estimand.** The primary estimand is the **average difference in light exposure between people with epilepsy and comparable controls within a matched sample** — an association conditional on the matched covariate set, not a nationally representative population parameter. Language throughout is framed accordingly ("epilepsy was associated with…" rather than "US adults with epilepsy have…"). A survey-weighted analysis targeting the national estimand is reported as a supplementary analysis (§8.6).
+**Estimand.** The primary estimand is the **average difference in light exposure between people with epilepsy and comparable controls within a matched sample** — an association conditional on the matched covariate set, not a nationally representative population parameter. Language throughout is framed accordingly ("epilepsy was associated with…" rather than "US adults with epilepsy have…"). A survey-weighted analysis targeting the national estimand is reported as a supplementary analysis (§8.5).
 
 ---
 
 ## 3. Design and data source
 
-Cross-sectional analysis of NHANES 2011–2012 and 2013–2014, the two cycles carrying the Physical Activity Monitor (PAM) component.
+Cross-sectional analysis of **NHANES 2013–2014 (cycle H)**. NHANES 2011–2012 (cycle G) carries the same Physical Activity Monitor (PAM) component and serves as a replication cohort under a broader, lower-specificity case definition (§4.5); it cannot support the primary case definition, for the reason given in §4.1.
 
 Participants wore an ActiGraph GT3X+ on the non-dominant wrist, 24 h/day, from the day of their Mobile Examination Center (MEC) visit until the morning of the ninth day. The device recorded triaxial acceleration at 80 Hz and ambient light in lux at 1 Hz; both are released summarised to the minute [NCHS_2022]. Movement is expressed in Monitor-Independent Movement Summary (MIMS) units [John_2019]. Approximately 96% of participants with data wore the device to day 9; on non-partial days the mean was ~1,437 valid minutes of a possible 1,440 [NCHS_2022].
 
@@ -68,24 +75,39 @@ Participants wore an ActiGraph GT3X+ on the non-dominant wrist, 24 h/day, from t
 
 ### 4.1 Epilepsy ascertainment
 
-NHANES 2011–2014 contains no direct epilepsy or seizure item in the medical conditions questionnaire. Cases are identified from the prescription medication file (RXQ_RX_G / RXQ_RX_H) as participants reporting a medication taken for a condition coded ICD-10-CM **G40** (epilepsy and recurrent seizures), with manual confirmation that the reported drug is a recognised antiseizure medication (ASM). This is the approach used by both prior NHANES epilepsy analyses [Terman_2020; Tang_2024].
+NHANES contains no direct epilepsy or seizure item in the medical conditions questionnaire. Cases are identified from the prescription medication file (`RXQ_RX_H`) **code-first**: participants reporting any medication taken for a condition coded ICD-10-CM **G40** (epilepsy and recurrent seizures) in `RXDRSC1–3`, followed by manual confirmation that the reported drug is a recognised antiseizure medication (ASM). Non-ASMs carrying a G40 code are blanked, as in [Terman_2020]. This is the approach used by both prior NHANES epilepsy analyses [Terman_2020; Tang_2024].
 
-**Why the reason-code requirement matters.** Many ASMs are widely prescribed off-label — gabapentin and pregabalin for neuropathic pain, topiramate for migraine, valproate and lamotrigine for bipolar disorder. Requiring a G40 indication rather than ASM use alone is the principal safeguard against false positives, since a gabapentin prescription for nerve pain carries a pain code, not G40. [Terman_2020] additionally excluded G40-coded medications that are not ASMs.
+**Why the reason-code requirement matters.** Many ASMs are widely prescribed off-label — gabapentin and pregabalin for neuropathic pain, topiramate for migraine, valproate and lamotrigine for bipolar disorder. Requiring a G40 indication rather than ASM use alone is the principal safeguard against false positives, since a gabapentin prescription for nerve pain carries a pain code, not G40.
 
-**Expected yield.** [Tang_2024] identified 53 cases among 7,410 in a single cycle (0.75%). Pooling both cycles and applying accelerometry validity criteria, we anticipate a case count in the region of 50–100. Precision, not sample size, is the binding constraint on this study (§9.4).
+**Why code-first rather than drug-first.** Selecting on a list of ASM names and then requiring G40 is not equivalent to selecting on G40 and then confirming the drug, because no name list is complete. In cycle H, drugs carrying a G40 reason code include lacosamide, clobazam, and clonazepam, lorazepam and diazepam used for seizure control — all absent from a conventional twelve-drug list. Code-first selection recovers these; drug-first selection discards them.
+
+**Why cycle H only.** `RXQ_RX_G` (2011–2012) contains **no reason-for-use variables at all** — CDC did not release them for that cycle, and only `RXQ_RX_H` carries `RXDRSC1–3`. The G40 requirement is therefore not implementable in cycle G under any coding strategy. This is consistent with the prior literature: [Tang_2024] used 2013–2014 and [Terman_2020] used 2013–2016, both avoiding cycle G. Cycle G is retained under the broad definition as a replication cohort (§4.5).
+
+**Measured yield.** Counts below are from the released data, restricted to current-use prescriptions (`RXDUSE == 1`), then to age ≥ 20, then to a valid recording.
+
+| Definition | Cycle | Identified | Age ≥ 20 | + valid recording |
+|---|---|---|---|---|
+| **Any drug + G40, ASM confirmed** (primary) | H | 72 | 56 | 46 |
+| ASM name-list + G40 | H | 61 | 47 | 39 |
+| ASM name-list only (broad) | H | 157 | 136 | 115 |
+| ASM name-list only (broad) | G | 123 | 101 | 87 |
+
+The primary definition yields **approximately 40–46 analysable cases**, consistent with [Tang_2024]'s 53 in the same cycle under a definition with no accelerometry validity requirement and no age restriction. Precision, not sample size, is the binding constraint on this study (§7).
+
+**Quantified misclassification, reported as a finding.** In cycle H the broad definition has a **positive predictive value of 38.9% against the G40 requirement** (61 of 157 name-list cases report epilepsy as the indication). The 96 discordant cases are dominated by topiramate for migraine (`G43`, n=26) and divalproex or lamotrigine for mood disorders (`F31.9` n=23, `F39` n=19, `F32.9` n=15) — precisely the off-label pattern the literature anticipates but has never quantified in NHANES. This estimate is reported in its own right: it is the first NHANES-specific quantification of misclassification from ASM-based epilepsy ascertainment, and it is what licenses the interpretation of the cycle G replication (§4.5).
 
 **Sensitivity analyses on case definition**
-1. Narrow definition: restrict to ASMs rarely used off-label (e.g. levetiracetam, phenytoin, carbamazepine, lacosamide).
-2. Broad definition: any ASM regardless of reason code.
-3. Primary definition (ASM + G40) as above.
+1. **Primary:** any drug with a G40 reason code, manually confirmed as an ASM (cycle H).
+2. **Narrow:** restrict to ASMs rarely used off-label (levetiracetam, phenytoin, carbamazepine, lacosamide) with a G40 code, testing whether the estimate is sensitive to residual off-label contamination.
+3. **Broad:** ASM name-list regardless of reason code — the only definition available in cycle G, and the basis of the replication cohort.
 
-Agreement across the three is reported; disagreement is interpreted as misclassification sensitivity.
+Agreement across the three is reported; disagreement is interpreted as misclassification sensitivity, informed by the measured PPV above.
 
 ### 4.2 Controls and matching
 
 Eligible controls are all other participants meeting the accelerometry validity criteria (§4.3). From this pool, a matched comparison group is constructed by **full matching on the propensity score** (§8.1). No exclusion by ASM use is applied under the primary definition, but a sensitivity analysis excludes control participants taking any ASM for a non-G40 indication, since these individuals may share medication-related effects without having epilepsy.
 
-**Why matching rather than regression adjustment alone.** With an anticipated 50–100 cases against several thousand controls, the two groups will differ substantially on demographic and socioeconomic characteristics. Relying on regression alone to correct imbalance of that magnitude requires extrapolation beyond the region where cases and controls overlap, and correct specification of the covariate–outcome relationship across that range.
+**Why matching rather than regression adjustment alone.** With approximately 40–46 cases against a control pool of roughly 4,800, the two groups will differ substantially on demographic and socioeconomic characteristics. Relying on regression alone to correct imbalance of that magnitude requires extrapolation beyond the region where cases and controls overlap, and correct specification of the covariate–outcome relationship across that range.
 
 This is also the design convention in comparable work. Large-cohort accelerometry studies with common exposures use whole-cohort regression without matching, but studies of rare neurological conditions match: [Bailey_2023] compared 241 dystonia cases with 964 matched controls in UK Biobank. The case count here is smaller still, placing this study firmly in the matched camp.
 
@@ -97,7 +119,8 @@ This is also the design convention in comparable work. Large-cohort accelerometr
 
 ### 4.3 Inclusion criteria
 
-- Aged ≥20 years at examination (following [Xiao_2023]; note [Tang_2024] included ages 3+, limiting direct comparability)
+- Examined in cycle H (2013–2014) for the primary analysis; cycle G is handled separately per §4.5
+- Aged ≥20 years at examination (`cohort.min_age`, following [Xiao_2023]; note [Tang_2024] included ages 3+, limiting direct comparability)
 - Not pregnant at the time of examination
 - Valid accelerometry per §5.2
 - Non-missing epilepsy ascertainment data
@@ -107,6 +130,21 @@ This is also the design convention in comparable work. Large-cohort accelerometr
 ASMs independently affect alertness, sleep architecture and activity levels, and are also the variable defining case status. Adjusting for "any ASM use" would adjust away the exposure.
 
 **Resolution.** The case–control contrast is presented as the total effect of **treated epilepsy**, and the manuscript states plainly that medication effects are part of this estimand rather than a confounder removed from it. Medication burden (polytherapy count; use of specifically sedating agents such as benzodiazepines or barbiturates) is examined as a covariate and potential effect modifier *within* the epilepsy group only, in a secondary analysis.
+
+### 4.5 Cycle G as a broad-definition replication cohort
+
+Cycle G is analysed separately, under the broad (name-list) case definition, and reported as a **replication cohort** rather than pooled with cycle H. Approximately 87 cases are available.
+
+**Why separate rather than pooled.** Pooling would require one of two things, and neither is acceptable. Applying the broad definition to both cycles would discard the reason-code information that exists in H and import an estimated 60% off-label contamination into the primary analysis. Applying different definitions to each cycle and pooling would build differential misclassification by cycle directly into the primary estimate, with the case group in one cycle systematically less specific than in the other. Reporting the cycles separately keeps the primary estimate clean and makes the replication interpretable on its own terms.
+
+**How it is interpreted.** The cycle G estimate is expected to be **attenuated toward the null** relative to cycle H, because roughly three in five of its cases are taking an ASM for migraine or a mood disorder rather than for epilepsy. The measured PPV of 38.9% (§4.1) gives this expectation a quantitative anchor. Two readings follow, and both are informative:
+
+- If cycle G shows an attenuated effect in the same direction, that is consistent with a real epilepsy effect diluted by misclassification, and the degree of attenuation can be compared against what the PPV predicts.
+- If cycle G shows an effect of similar magnitude to cycle H, that is evidence *against* an epilepsy-specific interpretation — it would suggest the association is driven by something common to ASM users generally, or by the indications themselves.
+
+The second reading is the more valuable, because it is a genuine falsification test that the primary analysis alone cannot provide. It is pre-specified here so that neither outcome can be presented as confirmatory after the fact.
+
+**What is not claimed.** Cycle G is not a nationally representative epilepsy sample, its case group is not an epilepsy case group in the sense cycle H's is, and no combined across-cycle estimate is reported. A sensitivity analysis restricted to the cycle G participants whose ASM is one rarely used off-label (§4.1 definition 2) is reported, as the closest available approximation to a specific definition in that cycle.
 
 ---
 
@@ -135,7 +173,7 @@ The first and last days of wear are partial by protocol [NCHS_2022] and are drop
 | [Xiao_2023] | ≥4 valid days; valid day = ≥20 h of valid recording |
 | [Su_2022] | ≥3 valid days with >16 h wear |
 
-**Primary rule adopted:** ≥4 valid days, valid day defined as ≥20 h of retained minutes, following [Xiao_2023]. Rationale: 20 h is a stricter wear requirement than 16 h, which matters because light metrics are sensitive to gaps; requiring 4 rather than 5 consecutive days retains more of a small case group than [Johnson_2023]'s rule would. The absence of any rule in [Tang_2024] is noted but not followed — without wear-time filtering, non-wear periods are indistinguishable from genuine inactivity, which biases IS, IV, RA and L5 in unpredictable directions and would be more damaging still for light metrics, since a device in a drawer reads near-zero lux.
+**Primary rule adopted:** ≥4 valid days (`validity.min_valid_days`), valid day defined as ≥20 h of retained minutes (`validity.min_wear_hours`), following [Xiao_2023]. Rationale: 20 h is a stricter wear requirement than 16 h, which matters because light metrics are sensitive to gaps; requiring 4 rather than 5 consecutive days retains more of a small case group than [Johnson_2023]'s rule would. The absence of any rule in [Tang_2024] is noted but not followed — without wear-time filtering, non-wear periods are indistinguishable from genuine inactivity, which biases IS, IV, RA and L5 in unpredictable directions and would be more damaging still for light metrics, since a device in a drawer reads near-zero lux.
 
 **Sensitivity:** the [Johnson_2023] and [Su_2022] rules are applied as alternatives and results reported.
 
@@ -149,7 +187,9 @@ Rest–activity metrics and light metrics use the same retained-minute set and t
 
 ### 6.1 Light exposure windows
 
-**Fixed clock-time windows are used: day 07:00–19:00, night 23:00–06:00.** These boundaries are pre-specified and are not revised after analysis begins. Hours around dawn and dusk (19:00–23:00, 06:00–07:00) are excluded from both windows rather than assigned to one.
+**Fixed clock-time windows are used: day 07:00–19:00 (`light.day_window`), night 23:00–06:00 (`light.night_window`).** These boundaries are pre-specified and are not revised after analysis begins. Hours around dawn and dusk (19:00–23:00, 06:00–07:00) are excluded from both windows rather than assigned to one.
+
+Note that the exploratory PAXLUX analysis used a night window of 20:00–05:00. Results computed under that window are not comparable with the specification above and are superseded, not merely exploratory.
 
 **Why clock-time rather than individually anchored windows.** Two alternatives exist. Sleep-anchored windows (light in the hours before sleep onset, during the sleep period, after wake) adapt to individual timing but require sleep timing to define the exposure — which conflicts directly with treating sleep as an outcome. L5-anchored windows [Johnson_2023] avoid that specific conflict, but introduce another: L5 is derived from the activity signal, and if PWE have flatter, more fragmented rhythms — precisely our hypothesis — then the L5 window is less well-defined in cases than in controls, giving differential measurement error in the group hypothesised to be affected. L5 is also defined as the *least active* window, and stillness in a dark room produces both low activity and low lux, so L5-light is partly shaped by its own selection criterion.
 
@@ -161,7 +201,7 @@ Fixed clock windows have neither problem. Their cost is that they conflate dose 
 
 ### 6.2 Daytime light metrics
 
-**Primary: time above threshold** — minutes per day above 100 lux, above 250 lux, and above 1,000 lux, averaged across valid days.
+**Primary: time above threshold** — minutes per day above 100 lux, above 250 lux, and above 1,000 lux (`light.day_thresholds`), averaged across valid days.
 
 **Why not mean daytime lux.** The NHANES light sensor is top-coded: *"Values at or above 2,500 lux were coded as '2,500 lux'"* [NCHS_2022]. CDC's own reference table in the same document places full daylight at 10,000–25,000 lux. Every moment of genuine outdoor daylight is therefore recorded as an identical value, and the ceiling sits an order of magnitude below the top of the real range. Since H1 concerns reduced *daytime* light, the censoring bites hardest exactly where the hypothesised group difference should be largest. Mean daytime lux is a mean of a censored variable and is not a defensible primary metric here.
 
@@ -210,11 +250,15 @@ Nonparametric metrics computed from minute-level MIMS: **IS, IV, RA, M10, L5**, 
 
 ### 6.6 Sleep (secondary)
 
-Sleep duration and sleep midpoint derived from the NHANES-provided PAXPREDM minute classification, summing sleep-classified minutes within each noon-to-noon day, following [Johnson_2023; Su_2022]. Implausible values (<3 h or >13 h) are excluded [Johnson_2023].
+Sleep duration and sleep midpoint are derived with **GGIR, using the diary-free algorithm of [vanHees_2018]**, as in [Bailey_2023] — see §9. Sleep-classified minutes are summed within each noon-to-noon day. Implausible values (<3 h or >13 h) are excluded, following [Johnson_2023].
 
-**Why sleep is secondary rather than a co-primary outcome family.** Sleep is strongly intercorrelated with the rest–activity metrics already in the model, so it adds a third correlated outcome family that consumes multiplicity budget without adding proportionate independent information. It also cannot be causally ordered relative to circadian disruption in cross-sectional data (§8.2). Its value here is descriptive and as a bridge to the sleep–seizure literature that motivates the study, not as an independent test.
+**Why GGIR rather than the NHANES-provided PAXPREDM classification.** An earlier draft of this document specified PAXPREDM's sleep category directly, on the precedent of [Johnson_2023; Su_2022]. That is not defensible: PAXPREDM is a *predicted* label, sleep/wake classification on this signal has F1 ≈ 0.84 [Thapa-Chhetry_2022], and using a predicted label as an outcome imports its error into the estimate without any means of characterising it. PAXPREDM is used **only for non-wear masking** (§5.1), where an imperfect label is acceptable because the consequence is lost data rather than biased measurement.
 
-**Limitation to state.** PAXPREDM is an algorithmic prediction, not a validated sleep measure; sleep/wake classification on this signal is imperfect [Thapa-Chhetry_2022]. Self-reported sleep duration (SLD010H) is modelled alongside as an auxiliary variable; agreement or disagreement between self-report and accelerometry is itself informative given that PWE may systematically misreport sleep.
+Two published alternatives to GGIR are equally defensible and are noted here in case the GGIR route proves impractical on MIMS-derived input: the PSG-validated classifier of [Thapa-Chhetry_2022], built specifically on the NHANES 2011–2014 ISM-filtered signal, and the Hidden Markov Model approach of [Su_2022]. Whichever is used is stated with its version and settings; the choice is not revisited after outcomes are examined.
+
+**Why sleep is secondary rather than a co-primary outcome family.** Sleep is strongly intercorrelated with the rest–activity metrics already in the model, so it adds a third correlated outcome family that consumes multiplicity budget without adding proportionate independent information. It also cannot be causally ordered relative to circadian disruption in cross-sectional data (§8.3). Its value here is descriptive and as a bridge to the sleep–seizure literature that motivates the study, not as an independent test.
+
+**Limitation to state.** All sleep measures here are accelerometer-derived, with no diary and no self-reported bedtime or waketime available in this cycle; actigraphy has good sensitivity for sleep but poor specificity for wake. Sleep onset latency is not reported, as it is unreliable from actigraphy. Self-reported sleep duration (SLD010H) is modelled alongside as an auxiliary variable; agreement or disagreement between self-report and accelerometry is itself informative given that PWE may systematically misreport sleep.
 
 ### 6.7 Covariates
 
@@ -234,7 +278,17 @@ Sleep duration and sleep midpoint derived from the NHANES-provided PAXPREDM minu
 
 ## 7. Sample size and power
 
-No formal a priori sample size calculation is possible, as the case count is fixed by the survey. With an anticipated 50–100 cases, power is dominated by the case count, and the study can reliably detect only moderate-to-large standardised differences. Full matching retains all cases (§8.1), which preserves what precision is available; the effective sample size after matching is reported and used in the power statement. Findings are framed as hypothesis-generating rather than definitive. The supplementary survey-weighted analysis (§8.5) will have lower precision still, because of the design effect.
+No formal a priori sample size calculation is possible, as the case count is fixed by the survey. The primary analysis has **approximately 40–46 cases** against a control pool of roughly 4,800 (§4.1), so power is dominated by the case count and the study can reliably detect only moderate-to-large standardised differences — on the order of Cohen's *d* ≥ 0.45 at 80% power, two-sided α = 0.05, before any design-effect inflation. Findings are framed as hypothesis-generating rather than definitive.
+
+Three consequences follow, and each is a design choice made because of the case count rather than in spite of it.
+
+- **Full matching retains all cases** (§8.1), where fixed-ratio caliper matching would discard the most demographically unusual ones. At this n that loss is unaffordable and non-random. The effective sample size after matching is reported and used in the power statement, since variable stratum sizes mean it differs from the matched control count.
+- **Categorical rather than continuous nighttime light** (§6.3) and a small number of pre-specified primary endpoints (§8.6) both reflect the same constraint: finely-adjusted continuous models are unstable at this case count, which is the pattern comparable small-exposure NHANES analyses follow [Terman_2020; Tang_2024].
+- **The survey-weighted analysis is supplementary, not primary** (§8.5). Its precision is lower still because of the design effect, and with ~45 cases distributed across PSUs some subgroup estimates will not be estimable at all.
+
+For the light arm specifically, the hierarchical-bootstrap power framework of Guidolin and Spitschan (2024) is the appropriate citation for a design-effect-adjusted statement, and is pre-registered alongside the analysis plan.
+
+**Note on the earlier estimate.** A previous version of this section anticipated 50–100 cases, extrapolating from [Tang_2024]'s 53 in a pooled two-cycle design. That figure did not survive contact with the data: cycle G cannot support the case definition at all (§4.1), and the accelerometry validity criteria remove a further fifth of cycle H cases. The revised range is measured, not projected.
 
 ---
 
@@ -248,9 +302,9 @@ The primary analysis proceeds in two stages — matching, then adjusted regressi
 
 A propensity score for epilepsy case status is estimated by logistic regression on the §4.2 matching variables. Participants are then partitioned by **full matching**, in which the sample is divided into strata each containing either one case with several controls or one control with several cases, chosen to minimise total within-stratum propensity-score distance. Each participant receives a matching weight reflecting their stratum composition.
 
-*Why full matching rather than fixed-ratio k:1 matching.* Fixed-ratio matching with a caliper discards cases that find no control within the caliper. With 50–100 cases this is unaffordable, and the losses are not random: the cases dropped are the most demographically unusual, so their exclusion is an uncontrolled selection process. Full matching retains every case, allows stratum size to vary with the local density of good matches, and generally achieves better covariate balance because it is never forced into poor matches in sparse regions. It requires no arbitrary choice of ratio.
+*Why full matching rather than fixed-ratio k:1 matching.* Fixed-ratio matching with a caliper discards cases that find no control within the caliper. With ~45 cases this is unaffordable, and the losses are not random: the cases dropped are the most demographically unusual, so their exclusion is an uncontrolled selection process. Full matching retains every case, allows stratum size to vary with the local density of good matches, and generally achieves better covariate balance because it is never forced into poor matches in sparse regions. It requires no arbitrary choice of ratio.
 
-*Alternative.* Overlap weighting is a reasonable substitute: it achieves exact balance on all covariates in the propensity model, retains all participants, and cannot produce extreme weights. Its estimand — the effect in the population whose characteristics could plausibly belong to either group — is arguably closer to the question of interest but harder to describe. It is reported as a sensitivity analysis (§8.5).
+*Alternative.* Overlap weighting is a reasonable substitute: it achieves exact balance on all covariates in the propensity model, retains all participants, and cannot produce extreme weights. Its estimand — the effect in the population whose characteristics could plausibly belong to either group — is arguably closer to the question of interest but harder to describe. It is reported as a sensitivity analysis (§8.4, item 5).
 
 **Stage 2 — Balance assessment.**
 
@@ -258,7 +312,7 @@ Standardised mean differences (SMDs) are computed for every matching variable be
 
 The **effective sample size** is reported rather than the raw matched control count, since variable stratum sizes mean these differ.
 
-*Fallback if the propensity model is unstable.* With 50–100 cases, a propensity model containing seven covariates sits at the edge of the conventional guide of roughly ten events per variable. If the model produces extreme scores or poor overlap, the fallback is exact or coarsened matching on the strongest confounders — season and sex exactly, age in five-year bands — with the remaining covariates handled by regression in Stage 3. This is a legitimate design choice at small sample size, not a concession, and is more robust than a strained propensity model.
+*Fallback if the propensity model is unstable.* With ~45 cases, a propensity model containing seven covariates sits **beyond** the conventional guide of roughly ten events per variable, which allows four to five. The fallback below is therefore the more likely path, not a remote contingency. If the model produces extreme scores or poor overlap, the fallback is exact or coarsened matching on the strongest confounders — season and sex exactly, age in five-year bands — with the remaining covariates handled by regression in Stage 3. This is a legitimate design choice at small sample size, not a concession, and is more robust than a strained propensity model.
 
 **Stage 3 — Weighted regression within the matched sample.**
 
@@ -314,12 +368,12 @@ Reported in supplementary material, targeting a national rather than sample-leve
 
 NHANES uses a complex, stratified, multistage probability design with deliberate oversampling of specific demographic groups, so unweighted estimates describe this sample rather than the US population, and ignoring the clustering produces standard errors that are too small.
 
-- **Weight:** WTMEC2YR, halved for the 4-year combined sample. The accelerometer was distributed at the end of the MEC visit, so the MEC weight is the correct "least common denominator". CDC has not released a PAM-specific weight; the PAXLUX documentation directs analysts to the examined-sample weights [NCHS_2022]. Note that [Tang_2024] used the interview weight (WTINT2YR), which is the wrong denominator for an examination-based measure.
+- **Weight:** `WTMEC2YR`, used **unhalved**, since the primary analysis is a single two-year cycle rather than a pooled four-year sample. (Halving applies only to a pooled G+H analysis, which this specification no longer performs — see §4.5.) The accelerometer was distributed at the end of the MEC visit, so the MEC weight is the correct "least common denominator". CDC has not released a PAM-specific weight; the PAXLUX documentation directs analysts to the examined-sample weights [NCHS_2022]. Note that [Tang_2024] used the interview weight (`WTINT2YR`), which is the wrong denominator for an examination-based measure.
 - **Design:** SDMVSTRA (strata), SDMVPSU (PSU), Taylor linearisation. In R: `svydesign(ids=~SDMVPSU, strata=~SDMVSTRA, weights=~wt4yr, nest=TRUE)` [Lumley_2010; Leroux_2019].
-- **Degrees of freedom:** design df = (number of PSUs − number of strata), typically ~30, not the sample size. With 50–100 cases distributed across PSUs, some strata may contain cases in only one PSU, breaking variance estimation. Stratum collapsing is applied where necessary and documented; estimates that are not estimable are reported as such rather than forced.
+- **Degrees of freedom:** design df = (number of PSUs − number of strata), typically ~30, not the sample size. With ~45 cases distributed across PSUs, many strata will contain cases in only one PSU, breaking variance estimation. Stratum collapsing is applied where necessary and documented; estimates that are not estimable are reported as such rather than forced.
 - **Model:** the §8.1 Model 1 specification, survey-weighted, on the full eligible sample.
 
-**Why this is supplementary rather than primary.** Survey weights and matching pursue incompatible objectives — weights make the sample resemble the US population, matching makes controls resemble the (demographically unrepresentative) cases — and combining them is contested [DuGoff_2014]. With 50–100 cases, the variance inflation from the design effect is unaffordable as a primary analysis, and subgroup estimates would frequently not be estimable. The matched analysis answers the study question with acceptable precision; the weighted analysis establishes whether the finding is robust to the choice of estimand.
+**Why this is supplementary rather than primary.** Survey weights and matching pursue incompatible objectives — weights make the sample resemble the US population, matching makes controls resemble the (demographically unrepresentative) cases — and combining them is contested [DuGoff_2014]. With ~45 cases, the variance inflation from the design effect is unaffordable as a primary analysis, and subgroup estimates would frequently not be estimable. The matched analysis answers the study question with acceptable precision; the weighted analysis establishes whether the finding is robust to the choice of estimand.
 
 **Reporting rule, fixed in advance.** Agreement or disagreement between the matched and weighted analyses is reported in one sentence in the main text regardless of direction, and the matched result is the one led with. This is specified before analysis so that the choice is not made after seeing both.
 
@@ -341,7 +395,18 @@ Extent and pattern of missingness in covariates reported. Where <5%, [Xiao_2023]
 
 ## 9. Software
 
-R (version to be stated). Matching: `MatchIt` (`method = "full"`) with `WeightIt` for the overlap-weighting sensitivity analysis; balance diagnostics via `cobalt`. Survey design for the supplementary analysis: `survey` [Lumley_2010]. Rest–activity metrics: `nparACT` [Blume_2016]. Circular statistics for clock-time variables: `circular` (§8.2). Sleep derivation: GGIR, using the diary-free algorithm of [vanHees_2018], as in [Bailey_2023]. Light metric extraction: `LightLogR` [Zauner_2025], with the caveat in §10.4. Full analysis code deposited on publication.
+The pipeline is split by language at a single, explicit boundary: **Python computes the measures, R fits the models**, and they exchange one participant-level CSV. Versions of both stacks are stated in the manuscript, and the exact environment is captured in a lock file. Full analysis code is deposited on publication.
+
+**Python** — data loading, minute-level masking, wear and valid-day determination (§5), and all metric computation (§6): light thresholds, day–night contrast, and the nonparametric metrics on both the light and activity channels. This is an existing tested package (`src/ambient_light_epilepsy`), verified against synthetic signals with hand-derived expected values, and it is where the minute-level PAXMIN handling lives. Parameters are read from `analysis_params.toml`.
+
+**R** — the statistical layer only. Matching: `MatchIt` (`method = "full"`), with `WeightIt` for the overlap-weighting sensitivity analysis and `cobalt` for balance diagnostics. Survey design for the supplementary analysis: `survey` [Lumley_2010]. Circular statistics for clock-time variables: `circular` (§8.2). Sleep derivation: GGIR, using the diary-free algorithm of [vanHees_2018], as in [Bailey_2023] (§6.6).
+
+**Boundary.** Python writes one row per participant — every metric from §6, the covariates from §6.7, case status, and the survey design variables — and R reads exactly that file. Nothing crosses the boundary except this table, so each side is independently testable and the handoff is inspectable.
+
+**Two deviations from the reference implementations, stated rather than glossed.**
+
+- **Nonparametric metrics are computed in Python, not `nparACT`** [Blume_2016], which [Tang_2024] used. Implementations of IS, IV, RA, M10 and L5 differ materially in binning, in the handling of missing minutes, and in whether a full-day restriction is applied, so package identity is not a substitute for reporting settings. This implementation resamples to hourly bins before computing IS, per Witting et al. (1990), which makes IS invariant to input resolution; IV is computed at the native epoch and is therefore resolution-dependent by construction. Both properties are asserted in the test suite. Agreement with `nparACT` is reported on a sample of participants as a validation check.
+- **`LightLogR`** [Zauner_2025] is the field standard for light metric extraction, but its metrics assume calibrated input and this analysis uses only relative photopic quantities on a top-coded sensor (§10.3, §10.4). It is used for cross-validation of the threshold metrics rather than as the primary computation path.
 
 ---
 
@@ -357,7 +422,7 @@ Photosensitivity cannot be measured in NHANES. Three responses are made: (i) the
 
 ### 10.2 Shared-device dependence
 
-Light, activity and sleep all derive from one wrist-worn sensor. A sedentary indoor person produces both low lux and low MIMS partly for mechanical reasons; sleep periods produce near-zero movement *and* near-zero light by construction, since the wrist may be under bedding. Light–activity associations are therefore partly non-independent by construction. This is acknowledged rather than solved; the coupling sensitivity analysis (§8.3.6) demonstrates awareness of the interdependence.
+Light, activity and sleep all derive from one wrist-worn sensor. A sedentary indoor person produces both low lux and low MIMS partly for mechanical reasons; sleep periods produce near-zero movement *and* near-zero light by construction, since the wrist may be under bedding. Light–activity associations are therefore partly non-independent by construction. This is acknowledged rather than solved; the coupling sensitivity analysis (§8.4, item 9) demonstrates awareness of the interdependence.
 
 ### 10.3 Sensor limitations
 
@@ -393,7 +458,7 @@ I have not verified every reference below against the primary source. Please che
 
 *This is the CDC/NCHS data documentation page, not a journal article. Everything attributed to it in this document — the 24 h wear protocol, the 80 Hz / 1 Hz sampling rates, the absence of any sleep diary or activity log, the partial first and last days, the 2,500 lux top-code, the "estimates … not meant for exact interpretation" caveat, and the direction to use the examined-sample weights — was read directly from this page.*
 
-*Caveat: I verified the **2013–2014 (PAXLUX_H)** documentation only. The companion 2011–2012 file (PAXLUX_G, https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2011/DataFiles/PAXLUX_G.htm) is presumed to describe the same protocol and the same top-coding, but I have not confirmed this. Since this analysis pools both cycles, please check PAXLUX_G before relying on any of the above as applying to 2011–2012 — particularly the 2,500 lux ceiling, which §6.2 depends on. If the two cycles differ, cite them separately as [NCHS_2022a] and [NCHS_2022b].*
+*Caveat: I verified the **2013–2014 (PAXLUX_H)** documentation only. The companion 2011–2012 file (PAXLUX_G, https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2011/DataFiles/PAXLUX_G.htm) is presumed to describe the same protocol and the same top-coding, but I have not confirmed this. Since cycle G serves as a replication cohort (§4.5), please check PAXLUX_G before relying on any of the above as applying to 2011–2012 — particularly the 2,500 lux ceiling, which §6.2 depends on. If the two cycles differ, cite them separately as [NCHS_2022a] and [NCHS_2022b].*
 [Johnson_2023] Johnson DA, Wallace DA, Ward L. Racial/Ethnic and Sex Differences in the Association between Light at Night and Actigraphy-Measured Sleep Duration in Adults: NHANES 2011–2014. *Sleep Health* 2024;10(1 Suppl):S184–S190. doi:10.1016/j.sleh.2023.09.011. PMID 37951773.
 [Xiao_2023] Xiao Q, Durbin J, Bauer C, Yeung CHC, Figueiro MG. Alignment Between 24-h Light-Dark and Activity-Rest Rhythms Is Associated With Diabetes and Glucose Metabolism. *Diabetes Care* 2023;46(12):2171–2179. doi:10.2337/dc23-1034.
 
@@ -433,12 +498,18 @@ I have not verified every reference below against the primary source. Please che
 1. **Clock window boundaries — fixed at day 07:00–19:00, night 23:00–06:00.** Hours 19:00–23:00 and 06:00–07:00 excluded from both windows. These are now specified, not placeholders, and should not be altered after analysis begins (§6.1).
 2. **Age lower bound — 20 years**, following [Xiao_2023]. Note when contrasting results that [Tang_2024] included ages 3 and up, so its estimates are not directly comparable to this adults-only analysis.
 3. **Depression — treated as a mediator, not a confounder.** It is therefore excluded from the matching set and from the primary model, and entered only in clearly-labelled secondary models (§6.7). The assumed structure is epilepsy → depression → reduced outdoor activity → reduced light exposure. This is an assumption, not a finding: cross-sectional data cannot establish the ordering, and a reviewer may reasonably argue depression precedes and confounds instead. State the assumption explicitly and justify it in the manuscript; the DAG (below) is the natural place to make it visible.
-4. **Propensity-model stability** — the matching set is six variables following the removal of smoking (§6.7), which eases but does not eliminate the events-per-variable constraint. The fallback specification (§8.1, Stage 2) is documented; the decision to invoke it will be made at the design stage, before outcomes are examined.
-5. **Pre-registration — to be completed before analysis.** OSF recommended. This is what licenses the balance-driven iteration in §8.1 Stage 2 and the fixed reporting rule in §8.5.
+4. **Propensity-model stability** — the matching set is seven variables (§4.2). At ~45 cases this is beyond the events-per-variable guide, so the fallback in §8.1 Stage 2 is the likely path rather than a contingency. The decision to invoke it is made at the design stage, before outcomes are examined.
+5. **Pre-registration — to be completed before analysis.** OSF recommended. This is what licenses the balance-driven iteration in §8.1 Stage 2 and the fixed reporting rule in §8.5. Tag this document in git at the point it is frozen, so the pre-registered version is recoverable without archaeology.
+6. **Scope — cycle H only for the primary analysis** (§3, §4.1), forced by the absence of reason-for-use variables in `RXQ_RX_G`. Cycle G is a labelled broad-definition replication cohort with a pre-specified interpretation (§4.5).
+7. **Case selection is code-first** — G40 in `RXDRSC1–3`, then ASM confirmation (§4.1). Drug-first selection is the broad definition and is not primary.
+8. **Sleep derivation — GGIR with the van Hees algorithm**, not the PAXPREDM sleep category (§6.6). PAXPREDM is used for non-wear masking only. This resolves a contradiction between earlier §6.6 and §9.
+9. **Software — Python for measures, R for models**, exchanging one participant-level CSV (§9).
+10. **Analysis parameters live in `analysis_params.toml`**, referenced by key from this document rather than restated.
 
 ### Remaining actions
 
-6. **[LancetHL_2023] author list** must be completed (§11). PMID 37148892.
-7. **PAXLUX_G (2011–2012) documentation** to be checked against PAXLUX_H, particularly the 2,500 lux ceiling on which §6.2 depends (§11).
-8. **Three unexplored methodological areas**, deferred: compositional / 24-hour time-use analysis; measurement-error and regression-calibration methods for wearable exposures; NHANES epilepsy ascertainment literature outside accelerometry.
-9. **Draw a DAG** of the assumed causal structure for the supplementary material. Given that several classifications in §6.7 are assumptions rather than findings — depression as mediator being the clearest — a directed acyclic graph converts an arguable set of choices into something a reader can inspect and contest. Recommended.
+11. **[LancetHL_2023] author list** must be completed (§11). PMID 37148892.
+12. **PAXLUX_G (2011–2012) documentation** to be checked against PAXLUX_H, particularly the 2,500 lux ceiling on which §6.2 depends (§11). Lower priority now that cycle G is a replication cohort, but still required before its results are reported.
+13. **Report the ascertainment PPV as a finding** (§4.1). No NHANES-specific study has quantified misclassification from ASM-based epilepsy ascertainment; the 38.9% estimate fills that gap and needs a home in the manuscript — most likely a short methods-adjacent result rather than a limitation.
+14. **Three unexplored methodological areas**, deferred: compositional / 24-hour time-use analysis; measurement-error and regression-calibration methods for wearable exposures; NHANES epilepsy ascertainment literature outside accelerometry.
+15. **Draw a DAG** of the assumed causal structure for the supplementary material. Given that several classifications in §6.7 are assumptions rather than findings — depression as mediator being the clearest — a directed acyclic graph converts an arguable set of choices into something a reader can inspect and contest. Recommended.

@@ -47,13 +47,15 @@ in several cases still reflects the superseded design.
 
 ## Running things
 
-Use `conda run` for Python. Direct `python.exe` invocations die silently on numpy linalg
-in this environment.
+Use `conda run` with the **`ambient-light-epilepsy`** environment — that is where the
+package is installed; `base` has neither it nor pytest configured. Direct `python.exe`
+invocations die silently on numpy linalg in this environment.
 
 ```bash
-conda run -n base python -m pytest
+conda run -n ambient-light-epilepsy python -m pytest tests -q
 ```
 
+Run pytest from the repository root and name `tests` explicitly, or it collects nothing.
 `conda run` cannot take a `-c` argument containing newlines — write a file instead.
 
 Data paths resolve through `config.toml` profiles (`hpc`, `w_drive`, `local`) and
