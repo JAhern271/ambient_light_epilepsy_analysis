@@ -96,14 +96,16 @@ part_size() { stat -c%s "$1" 2>/dev/null || echo 0; }
 # Fetch one byte range, resuming from whatever is already on disk.
 fetch_part() {
     local idx="$1" start="$2" end="$3"
-    local part want have from attempt=0
+    local part err want have from attempt=0
     part="$(part_path "$idx")"
+    err="${part}.err"
     want=$(( end - start + 1 ))
 
     while (( attempt < MAX_ATTEMPTS )); do
         have="$(part_size "$part")"
 
         if (( have == want )); then
+            rm -f "$err"
             return 0
         fi
         if (( have > want )); then          # can only be corruption; start over
@@ -112,15 +114,22 @@ fetch_part() {
         fi
 
         from=$(( start + have ))
+        # curl's stderr is kept, not discarded: an unsupported option or a
+        # refused range fails instantly and silently otherwise, and the loop
+        # then spins to its attempt limit with nothing in the log to say why.
         # --speed-time/--speed-limit abandon a stalled connection so it is
-        # retried, rather than hanging until the TCP timeout.
-        curl -sS --fail --retry 3 --retry-delay 5 --retry-all-errors \
-             --speed-time 60 --speed-limit 1024 \
-             -r "${from}-${end}" "$URL" >> "$part" 2>/dev/null || true
+        # retried rather than hanging until the TCP timeout.
+        curl -sS --fail --retry 3 --retry-delay 5 --speed-time 60 --speed-limit 1024 -r "${from}-${end}" "$URL" >> "$part" 2>"$err" || true
 
         attempt=$(( attempt + 1 ))
+
         if (( "$(part_size "$part")" == have )); then
-            sleep 10                        # no progress; back off before retrying
+            if [[ -s "$err" ]]; then
+                echo "part $(printf %03d "$idx") attempt ${attempt}: $(head -1 "$err")" >&2
+            else
+                echo "part $(printf %03d "$idx") attempt ${attempt}: no bytes received" >&2
+            fi
+            sleep 10
         fi
     done
 
@@ -177,7 +186,9 @@ fi
 
 echo
 echo "Assembling ${OUTPUT}..."
-cat "${PARTS_DIR}"/part.* > "$OUTPUT"
+# Match only part.NNN: the .err files live in the same directory, and a
+# bare part.* glob would concatenate them into the output.
+cat "${PARTS_DIR}"/part.[0-9][0-9][0-9] > "$OUTPUT"
 
 FINAL="$(part_size "$OUTPUT")"
 if (( FINAL != TOTAL )); then
