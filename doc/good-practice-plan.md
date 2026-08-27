@@ -168,8 +168,9 @@ PAXMIN arrives as an `.xpt` and its integrity is now load-bearing.
 - [ ] **Write a manifest** of raw inputs with checksums, so a partial or corrupt download
       is detectable. Now the highest-value item here: it would settle whether `PAXMIN_H`
       genuinely has more missing data than `PAXMIN_G`, or was simply downloaded badly.
-- [ ] **Script the NHANES download** — fetch the `.xpt` files from the CDC, recording URLs
-      and checksums.
+- [x] **NHANES download scripted** — `scripts/fetch_nhanes.sh`, using parallel range
+      requests because the CDC throttles per connection. Verified against a
+      single-connection fetch: identical MD5, and the resume path exercised.
 - [x] **Second clone on the W: drive reconciled** — its only uncommitted changes were
       whitespace, and it now tracks `good-practice-restructure`.
 - [ ] ~~Rerun both cohorts through the parameterised scripts.~~ Deferred: only affects

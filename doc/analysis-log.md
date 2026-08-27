@@ -19,6 +19,42 @@ Template:
 
 ---
 
+## 2026-08-27 — The CDC throttles per connection; download scripted
+
+**Ran:** A second manual re-download of `PAXMIN_H.xpt` failed worse than the first: 39,541
+of 88,223,479 records carrying data, against 28,192,818 before. Both attempts produced a
+file of exactly 9,351,691,760 bytes.
+
+**Found:** that is precisely the `Content-Length` the CDC advertises. A transfer to a
+network drive preallocates the full length from that header, so an interrupted download
+leaves a complete-looking file with a zero tail. Two failures at different points, both
+the "right" size.
+
+Not a disk-space problem: 2.5 TB free on the share.
+
+**The download is slow at source, not locally.** From an unrelated network the same URL
+gives 91.7 KB/s, matching the 81 KB/s seen on BlueBEAR, and explaining the 30-hour ETA on
+a single `wget`. Two simultaneous connections each sustained 92.5 KB/s, so **the throttle
+is per connection, not per client**.
+
+**Written:** `scripts/fetch_nhanes.sh` splits the file into byte ranges and fetches them
+concurrently, roughly N times faster for N connections. Sixteen should bring 8.7 GB under
+two hours. It assembles the output only once every part is present and the total matches
+the advertised size.
+
+Verified end to end against a 4 MB slice: the parallel result is byte-identical to a
+single-connection fetch (same MD5), and took 17 s against 47 s. The resume path was
+exercised by pre-seeding one complete and one truncated part — the complete part was
+skipped, the truncated one refetched, and the result still matched.
+
+**Note the URL is confirmed:** `https://ftp.cdc.gov/pub/NHANES/LargeDataFiles/PAXMIN_H.xpt`
+returns HTTP 200, 9,351,691,760 bytes, `Last-Modified` 1 Aug 2022 — so the data has not
+changed since cycle G was processed. No zipped version exists.
+
+**Still outstanding:** the download itself, and everything in Phase 4b for cycle H.
+
+---
+
 ## 2026-08-18 — Correction: PAXMIN_H is a bad download, not a bad conversion
 
 **Supersedes the entry below.** That entry concluded the source `.xpt` was intact and the

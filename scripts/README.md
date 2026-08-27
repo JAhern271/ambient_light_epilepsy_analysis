@@ -13,6 +13,25 @@ serves both cohorts and nothing needs editing between runs.
 > remains on the critical path, since PAXMIN itself arrives as an `.xpt` file. See
 > `doc/data-sources.md`.
 
+## Getting the raw data
+
+`fetch_nhanes.sh` downloads a large NHANES file over several connections at once:
+
+```bash
+scripts/fetch_nhanes.sh https://ftp.cdc.gov/pub/NHANES/LargeDataFiles/PAXMIN_H.xpt
+scripts/fetch_nhanes.sh <url> --max-bytes 4000000 -o sample.bin   # test the link first
+```
+
+ftp.cdc.gov throttles each connection to about 90 KB/s, so a single `wget` on the
+8.7 GB `PAXMIN_H.xpt` reports an ETA near 30 hours. The limit is per connection, not per
+client, so sixteen connections bring it under two hours. Rerunning resumes: parts already
+complete are skipped.
+
+The output is only written once every part is present and the total matches the size the
+server advertised, which avoids the failure that produced a full-length zero-padded file
+twice. Size alone is not proof, so check the contents afterwards with
+`check_data_integrity.py`.
+
 ## Pipeline order
 
 | Step | Script | Does |
