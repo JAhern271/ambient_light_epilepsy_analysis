@@ -1,4 +1,15 @@
-# Study protocol
+# Study protocol (ORIGINAL — SUPERSEDED)
+
+> **Status:** SUPERSEDED by [../methods.md](../methods.md). Retained for provenance only.
+> Nothing in this file is current, including its "Deviations from protocol" table, which
+> claimed to be "the authoritative description of what the code actually does". It is not.
+> The spec ↔ code gap is tracked in [../implementation-status.md](../implementation-status.md).
+>
+> **What changed:** the study is now cycle H only for the primary analysis, with a
+> code-first (ICD-10 G40) case definition, propensity full matching, and threshold-based
+> rather than mean-based light metrics. The design below predates all of that.
+>
+> **Still useful for:** the Background and rationale section, and the reference list.
 
 Ambient light exposure and circadian disruption in epilepsy.
 

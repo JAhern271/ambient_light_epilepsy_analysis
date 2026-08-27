@@ -1,5 +1,12 @@
 # Data sources and dictionary
 
+> **Status:** descriptive reference. This file records what the code currently reads and
+> computes — not what it should. The normative source is [methods.md](methods.md); where
+> the two disagree that is a bug, tracked in
+> [implementation-status.md](implementation-status.md).
+>
+> Definitions below carry a status marker where they are known to differ from the spec.
+
 Every NHANES table used, every variable pulled from it, and how each derived variable is
 defined. Cycle codes are `G` (2011–2012) and `H` (2013–2014).
 

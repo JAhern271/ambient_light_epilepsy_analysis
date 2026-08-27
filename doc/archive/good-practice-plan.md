@@ -1,4 +1,14 @@
-# Plan: bringing this project into line with good scientific computing practice
+# Plan: bringing this project into line with good scientific computing practice (COMPLETED / SUPERSEDED)
+
+> **Status:** SUPERSEDED by [../implementation-status.md](../implementation-status.md),
+> which is now the single to-do list. Retained for provenance: Phases 1–5 were largely
+> completed and the record of what was done is worth keeping.
+>
+> **Do not work from this file.** Its live items have been carried over; its
+> "Deliberately out of scope" section is actively wrong, because the spec has since
+> resolved several of those items differently — notably BMI and physical activity, which
+> are now deliberate *exclusions* (they are treated as mediators), not outstanding
+> matching variables.
 
 Working plan for restructuring the repository against Noble (2009), *A Quick Guide to
 Organizing Computational Biology Projects*, and Wilson et al. (2017), *Good Enough
@@ -90,7 +100,7 @@ right.
       `tests/regenerate_regression_fixture.py` to update it deliberately. Skips
       automatically where the real data is unreachable.
 - [x] **Known-suspect areas checked.** See the 2026-08-17 entry in
-      [analysis-log.md](analysis-log.md) — this turned up a real problem in
+      [analysis-log.md](../analysis-log.md) — this turned up a real problem in
       `interdaily_stability`, described below.
 
 ### IS definition (RESOLVED 2026-08-17)
@@ -101,7 +111,7 @@ right.
       A `bin_size` argument allows other resolutions.
 - [x] **The finding survives and strengthens.** Recomputed for all 861 participants: IS
       remains lower in PWE, and now stays significant after adjusting for employment and
-      depression (p = 0.035, previously p = 0.056). See [analysis-log.md](analysis-log.md).
+      depression (p = 0.035, previously p = 0.056). See [analysis-log.md](../analysis-log.md).
 - [x] **Regression fixture regenerated** deliberately, and tests now assert that IS is
       independent of input resolution.
 - [x] **Confirmed no 1 Hz metric recompute is needed.** Corrected IS computed from 1 Hz
@@ -188,7 +198,7 @@ work is going, not where it has been.
       activity and light.
 - [ ] **Test it**, as was done for the light metrics. The same trap applies: a wrong wear
       threshold produces plausible numbers rather than an error.
-- [x] **`PAXMIN_H` question resolved 2026-08-18: the file is truncated and zero-padded**, holding 2,489 of 7,776 participants. A conversion fault, not real missing data. Needs reconverting before any cycle H PAXMIN result. See [analysis-log.md](analysis-log.md).
+- [x] **`PAXMIN_H` question resolved 2026-08-18: the file is truncated and zero-padded**, holding 2,489 of 7,776 participants. A conversion fault, not real missing data. Needs reconverting before any cycle H PAXMIN result. See [analysis-log.md](../analysis-log.md).
 - [ ] **Rerun the light metrics on PAXMIN light** (`PAXLXMM`). `lux_metrics.py` is
       source-agnostic, so this needs no new metric code — but note `IV` is resolution
       dependent, so minute-level values will not match the PAXLUX figures, while `IS`

@@ -1,4 +1,23 @@
-# Methodological Standard for a Cross-Sectional NHANES 2011–2014 Analysis of Ambient Light, Rest–Activity Rhythms and Sleep in People With Epilepsy
+# Methodological standard: literature scan, 19 August 2026 (SUPERSEDED as guidance)
+
+> **Status:** SUPERSEDED as guidance by [../methods.md](../methods.md), which took the
+> decisions this scan laid out the options for. Retained because it remains the citation
+> source and evidence base for the methods.
+>
+> **Do not follow its recommendations.** Three of its claims are now known to be wrong:
+>
+> 1. **"No published study has analysed the NHANES PAXLUX ambient-light channel as a
+>    circadian exposure in adults"** — refuted by Johnson 2023 (*Sleep Health*) and
+>    Xiao 2023 (*Diabetes Care*), both adult NHANES 2011–2014 light analyses. The
+>    surviving novelty claim is narrower: no adult NHANES light paper *in epilepsy*.
+> 2. **Survey-weighted analysis as primary** — overturned. The primary estimand is now a
+>    matched-sample one, with the survey-weighted analysis supplementary; see methods.md §8.5.
+> 3. **"Raw 1 Hz lux is large/partly RDC-restricted"** — wrong. The 1 Hz PAXLUX files are
+>    public and are already downloaded and processed in this project. Its "benchmarks that
+>    would change the recommendation" section is therefore partly moot.
+>
+> Its expected-case-count estimate (~40–60) turned out to be accurate; see
+> [../analysis-log.md](../analysis-log.md).
 
 ## TL;DR
 - The single direct precedent is Tang, Zhou & Zhai (2024, *Front Neurol* 15:1496507): it used NHANES 2013–2014, defined epilepsy from the prescription file (ICD-10 G40 + manual antiseizure-medication screen), found only 53 cases among 7,410, and derived IS/IV/RA/M10/L5 with nparACT — but it never analysed PAXLUX light, never modelled sleep, and did not report using SDMVSTRA/SDMVPSU or the correct MEC accelerometry weight. **No published study has analysed the NHANES PAXLUX ambient-light channel as a circadian exposure in adults**, so the light arm of your paper is genuinely novel and must borrow its entire metric/reporting framework from UK Biobank and the Spitschan/CIE light-metrology literature.

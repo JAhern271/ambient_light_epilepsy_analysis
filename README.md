@@ -6,7 +6,7 @@ epilepsy?
 
 This repository analyses wrist-worn light sensor (LUX) and accelerometry recordings from
 two NHANES cycles, comparing people identified as having epilepsy against
-frequency-matched controls. See [doc/protocol.md](doc/protocol.md) for the full study
+frequency-matched controls. See [doc/methods.md](doc/methods.md) for the full study
 rationale, aims and planned methods.
 
 **Status:** an exploratory light-exposure analysis is complete, based on the 1 Hz `PAXLUX`
@@ -15,7 +15,7 @@ carries minute-level light *and* activity for the same participants — sufficie
 resolution for circadian-scale work, and it allows light and activity to be compared on
 identical sampling. That analysis is in progress. See
 [doc/data-sources.md](doc/data-sources.md) for how the two light sources differ,
-[doc/good-practice-plan.md](doc/good-practice-plan.md) for outstanding work, and
+[doc/implementation-status.md](doc/implementation-status.md) for outstanding work, and
 [doc/analysis-log.md](doc/analysis-log.md) for the running record.
 
 ## Findings so far (exploratory, PAXLUX)

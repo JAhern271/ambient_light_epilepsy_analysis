@@ -1,8 +1,15 @@
-# Ambient light exposure and rest–activity rhythm disruption in people with epilepsy: NHANES 2011–2014
+# Ambient light exposure and rest–activity rhythm disruption in people with epilepsy: NHANES
 
-**Methods — working draft for review**
-Date: 20 August 2026
-Status: draft for editing. Citation confidence is flagged throughout; see §11.
+> **Status:** normative specification for this study. If the code disagrees with this
+> document, the code is wrong — that gap is tracked in
+> [implementation-status.md](implementation-status.md), not resolved by editing this file
+> to match the code.
+>
+> **Revised:** 2026-08-27. **Supersedes:** [archive/protocol-original.md](archive/protocol-original.md).
+> **Revision in progress:** scope is being narrowed to cycle H; see
+> [implementation-status.md](implementation-status.md) for what still refers to the pooled design.
+>
+> Citation confidence is flagged throughout; see §11.
 
 ---
 

@@ -1,5 +1,9 @@
 # Analysis log
 
+> **Status:** history, append-only. Records what was run and what it showed at the time.
+> Entries are never edited to reflect later understanding — a superseding entry is added
+> instead. Nothing here is a specification; see [methods.md](methods.md) for that.
+
 Dated record of what was run, where, and what it showed. Newest entries at the top.
 
 Add an entry whenever you run something whose result you would want to explain later —
@@ -446,7 +450,7 @@ Also confirmed that `PAXMIN_H.parquet` **does** exist on the W: drive — it is 
 from the local partial copy — so the sparse H-cohort activity data noted in notebook 09
 is not explained by a missing file.
 
-**Next:** Phases 1 and 2 of [good-practice-plan.md](good-practice-plan.md).
+**Next:** Phases 1 and 2 of [archive/good-practice-plan.md](archive/good-practice-plan.md).
 
 ---
 
