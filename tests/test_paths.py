@@ -101,3 +101,17 @@ def test_lux_file_naming(data_root):
 def test_lux_dir_rejects_an_unknown_downsample(data_root):
     with pytest.raises(ValueError, match="downsample"):
         paths.lux_dir("G", downsample="10min")
+
+
+def test_raw_xpt_found_without_a_converted_parquet(data_root):
+    """
+    The source must be checkable when the parquet is absent — exactly the
+    situation after deleting a bad conversion.
+    """
+    (data_root / "H").mkdir()
+    expected = data_root / "H" / "PAXMIN_H.xpt"
+    expected.write_bytes(b"not really an xpt")
+
+    assert paths.raw_xpt("H", "PAXMIN") == expected
+    with pytest.raises(FileNotFoundError):
+        paths.raw_table("H", "PAXMIN")

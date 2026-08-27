@@ -162,6 +162,23 @@ def raw_table(year, table, base_path=None):
     )
 
 
+def raw_xpt(year, table, base_path=None):
+    """
+    Path to a raw NHANES .xpt, whether or not it has been converted yet.
+
+    Deliberately independent of raw_table: the source must be checkable when
+    the parquet is missing, which is exactly the situation after deleting a
+    bad conversion.
+    """
+    root = data_root(base_path)
+    filename = f"{table}_{year}.xpt"
+
+    return _first_existing(
+        [root / year / filename, root / year / "raw_xpt" / filename],
+        f"raw XPT for {table}, cohort {year}",
+    )
+
+
 def processed_dir(year=None, base_path=None, create=False):
     """
     Directory holding derived cohort files (PWE lists, matched controls).

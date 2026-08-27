@@ -33,8 +33,11 @@ def check(year, base_path):
     # Check the source first: if the .xpt is short, no amount of reconverting
     # will help, and the parquet findings below are a consequence not a cause.
     source_ok = True
-    xpt = paths.raw_table(year, "PAXMIN", base_path).with_suffix(".xpt")
-    if xpt.exists():
+    try:
+        xpt = paths.raw_xpt(year, "PAXMIN", base_path)
+    except FileNotFoundError:
+        xpt = None
+    if xpt is not None:
         src = integrity.check_xpt(xpt)
         print(f"  source .xpt          : {src['records']:,} records,"
               f" {src['real_records']:,} carrying data")
@@ -42,7 +45,7 @@ def check(year, base_path):
             print(f"  PROBLEM (source)     : {problem}")
             source_ok = False
     else:
-        print(f"  source .xpt          : not present at {xpt}")
+        print("  source .xpt          : not found")
     result = integrity.check_paxmin(year, base_path)
 
     print(f"  rows                 : {result['rows']:,}")
