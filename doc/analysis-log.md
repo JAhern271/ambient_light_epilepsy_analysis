@@ -23,6 +23,49 @@ Template:
 
 ---
 
+## 2026-09-02 — PAXMIN_H downloaded, converted and verified complete
+
+**Ran:** `scripts/check_data_integrity.py` against both cohorts, after the parallel
+re-download and reconversion.
+
+```
+=== PAXMIN_G ===                          === PAXMIN_H ===
+source .xpt : 78,126,856 / 78,126,856     source .xpt : 88,223,479 / 88,223,479
+padding rows: 0                           padding rows: 0
+participants: 6,917 of 6,917              participants: 7,776 of 7,776
+SEQN range  : 62161-71916 (full)          SEQN range  : 73557-83731 (full)
+cohort      : 82/82 cases, 276/276        cohort      : 110/110 cases, 393/393
+```
+
+**Found: cycle H is now complete.** All 110 cases and 393 controls are present, against
+40 and 130 from the truncated file. The converted parquet is 912 MB against G's 871 MB,
+the ratio expected given H has slightly more data; the broken version was 292 MB.
+
+**What it took.** Four attempts, and each failure sharpened the tooling rather than just
+costing time:
+
+1. Two manual downloads produced full-length, zero-padded files. Both matched the
+   advertised `Content-Length` exactly, because a transfer to a network drive
+   preallocates from that header, so size checks could not detect either.
+2. A reconversion with raised limits produced a byte-identical parquet, which showed the
+   fault was in the source rather than the converter, and corrected an earlier diagnosis
+   that had blamed the conversion.
+3. `scripts/fetch_nhanes.sh` was written after measuring that the CDC throttles per
+   connection rather than per client: sixteen connections gave 16.7x throughput, turning
+   a 30-hour ETA into under two hours.
+4. The first parallel run reached 89.6% before two connections timed out, which exposed
+   that partial parts were discarded rather than resumed, and that curl's stderr was
+   being sent to /dev/null so the failure was invisible.
+
+**Guards now in place:** the source `.xpt` is checked for zero-filling before the parquet
+is trusted, participant coverage is compared against PAXHD rather than relying on row
+counts or file size, and the check reports which of source or conversion is at fault.
+
+**Unblocks Phase 4b for cycle H.** With the spec now scoped to cycle H, this was the
+gating dependency for the entire primary analysis.
+
+---
+
 ## 2026-08-27 — Cycle G has no reason-for-use codes; study rescoped to cycle H
 
 **Ran:** Compared candidate epilepsy case definitions in `RXQ_RX`, both cycles, on this

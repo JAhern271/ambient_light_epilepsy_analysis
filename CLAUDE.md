@@ -94,7 +94,7 @@ project is a plausible wrong number reaching a manuscript, not a crash.
   the file. Fluent prose about the data is not evidence about the data.
 - **Prefer plain code over clever code**, and write it to be maintainable by someone who
   did not write it. If an explanation requires understanding the implementation, the
-  implementation is wrong for this context.
+  implementation is wrong for this context. Always explain code with enough comments.
 - **Do not touch `results/`, and do not rerun anything that overwrites a previous run,
   without being asked explicitly.**
 - **Scientific judgment belongs to the researcher.** For choices of estimand, endpoints,

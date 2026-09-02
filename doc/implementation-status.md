@@ -51,13 +51,15 @@ gap the literature scan identified as unfilled.
 
 ## Blocking
 
-- [ ] **`PAXMIN_H` download.** Truncated and zero-padded on both previous attempts; the
-      CDC throttles per connection, so `scripts/fetch_nhanes.sh` fetches byte ranges in
-      parallel. **In progress 2026-08-27, being handled outside this repo.** Everything
-      cycle-H-side waits on this, which is now the whole primary analysis.
-- [ ] **Reconvert and integrity-check `PAXMIN_H`** once the download lands. Use
-      `scripts/check_data_integrity.py`; the failure mode is a complete-looking file with
-      a zero tail, so check record counts, not file size.
+*Nothing is blocked. The `PAXMIN_H` dependency cleared on 2026-09-02.*
+
+- [x] **`PAXMIN_H` download.** Done 2026-09-02 via `scripts/fetch_nhanes.sh` with 16
+      parallel connections, 16.7x the single-connection throughput.
+- [x] **Reconverted and integrity-checked.** Both cohorts pass: 88,223,479 of 88,223,479
+      records carrying data for H, 0 padding rows, 7,776 of 7,776 participants,
+      **110/110 cases and 393/393 controls**, against 40 and 130 from the truncated file.
+      Cycle G unchanged and complete. See the 2026-09-02 entry in
+      [analysis-log.md](analysis-log.md).
 
 ## Spec ↔ code gaps
 
