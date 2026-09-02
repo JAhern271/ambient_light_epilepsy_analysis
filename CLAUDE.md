@@ -30,9 +30,12 @@ in several cases still reflects the superseded design.
 - **Cycle H (2013–2014) only for the primary analysis.** `RXQ_RX_G` carries no
   reason-for-use variables, so the case definition cannot be applied to cycle G at all.
 - **Case definition is code-first:** select on ICD-10 `G40` in `RXDRSC1–3`, then confirm
-  the drug is an ASM. The 12-name ASM list in `cohort.py` is the **broad** definition — it
-  has a PPV of 38.9% against G40 and is for cycle G replication and sensitivity analysis
-  only. Never present it as the primary definition.
+  the drug is an ASM. `cohort.find_cases(cycle, definition=)` implements this; the drug
+  lists live in `analysis_params.toml`, not in `cohort.py`. The 12-name `asm_broad` list
+  is the **broad** definition — it has a PPV of 38.9% against G40 and is for cycle G
+  replication and sensitivity analysis only. Never present it as the primary definition.
+  Note `matching.eligible_participants` still *defaults* to the legacy broad file, so
+  passing `definition="primary"` is currently required to get the primary cohort.
 - **Cycle G is a labelled broad-definition replication cohort**, not part of the primary
   analysis.
 - **Python for metrics, R for statistics**, with a participant-level CSV at the boundary.

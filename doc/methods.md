@@ -15,6 +15,7 @@
 
 | Date | Change |
 |---|---|
+| 2026-09-02 | §4.1 measured-yield table corrected: the row labelled "any drug + G40, ASM confirmed" (72 / 56 / 46) was in fact the count *before* non-ASMs were blanked. With the confirmation step the specification requires, the primary definition yields **70 / 54 / 44**. Both rows are now shown. No definition changed; the label was wrong. `narrow_nocode` named as a fourth definition for the cycle G approximation §4.5 already described in prose (§4.1, §4.5). |
 | 2026-08-27 | Scope narrowed to cycle H for the primary analysis, after `RXQ_RX_G` was found to carry no reason-for-use variables (§4.1). Cycle G becomes a labelled broad-definition replication cohort (§4.5). Case ascertainment restructured as code-first. Yield and power restated on measured counts (§4.1, §7). Sleep derivation contradiction between §6.6 and §9 resolved in favour of GGIR. Software split between Python and R (§9). Parameter values moved to `analysis_params.toml`. |
 | 2026-08-20 | First complete draft. |
 
@@ -87,21 +88,31 @@ NHANES contains no direct epilepsy or seizure item in the medical conditions que
 
 | Definition | Cycle | Identified | Age ≥ 20 | + valid recording |
 |---|---|---|---|---|
-| **Any drug + G40, ASM confirmed** (primary) | H | 72 | 56 | 46 |
+| **Any drug + G40, ASM confirmed** (primary) | H | **70** | **54** | **44** |
+| Any drug + G40, *before* ASM confirmation | H | 72 | 56 | 46 |
 | ASM name-list + G40 | H | 61 | 47 | 39 |
+| G40 + ASMs rarely used off-label (narrow) | H | 38 | 31 | 26 |
 | ASM name-list only (broad) | H | 157 | 136 | 115 |
 | ASM name-list only (broad) | G | 123 | 101 | 87 |
 
-The primary definition yields **approximately 40–46 analysable cases**, consistent with [Tang_2024]'s 53 in the same cycle under a definition with no accelerometry validity requirement and no age restriction. Precision, not sample size, is the binding constraint on this study (§7).
+**On the confirmation step.** Nineteen distinct drug names carry a G40 code in cycle H. Sixteen are ASMs; three are not — allopurinol, hydrocodone and alprazolam — and are blanked. Two participants are lost by this, because a non-ASM was their only G40-coded prescription: one whose allopurinol is coded G40 in a record otherwise of gout and diabetes (their gabapentin is coded `M79.2`), and one whose alprazolam carries `F41.9` primary with G40 secondary alongside citalopram. Clonazepam, lorazepam and diazepam *are* retained, since all three are used for seizure control; alprazolam is not. The hydrocodone participant also has a confirmed ASM with G40, so only the row is blanked, not the person. Gabapentin with a G40 code is retained: the code is the indication evidence, which is the whole basis of code-first selection, even though gabapentin is excluded from the broad name list as non-specific.
+
+An earlier version of this table gave 72 / 56 / 46 for the primary row. That was the count before confirmation, mislabelled; the definition itself is unchanged.
+
+The primary definition yields **approximately 40–46 analysable cases**: 44 under the validity rule the code currently applies (`PAXSTS == 1` and all nine days present) and 46 under `PAXSTS == 1` alone. The rule this document actually specifies in §5.2 is not yet implemented, so its yield is not yet measured; it is looser than the nine-day requirement, so it should fall between these. The range is consistent with [Tang_2024]'s 53 in the same cycle under a definition with no accelerometry validity requirement and no age restriction. Precision, not sample size, is the binding constraint on this study (§7).
 
 **Quantified misclassification, reported as a finding.** In cycle H the broad definition has a **positive predictive value of 38.9% against the G40 requirement** (61 of 157 name-list cases report epilepsy as the indication). The 96 discordant cases are dominated by topiramate for migraine (`G43`, n=26) and divalproex or lamotrigine for mood disorders (`F31.9` n=23, `F39` n=19, `F32.9` n=15) — precisely the off-label pattern the literature anticipates but has never quantified in NHANES. This estimate is reported in its own right: it is the first NHANES-specific quantification of misclassification from ASM-based epilepsy ascertainment, and it is what licenses the interpretation of the cycle G replication (§4.5).
 
-**Sensitivity analyses on case definition**
-1. **Primary:** any drug with a G40 reason code, manually confirmed as an ASM (cycle H).
-2. **Narrow:** restrict to ASMs rarely used off-label (levetiracetam, phenytoin, carbamazepine, lacosamide) with a G40 code, testing whether the estimate is sensitive to residual off-label contamination.
-3. **Broad:** ASM name-list regardless of reason code — the only definition available in cycle G, and the basis of the replication cohort.
+**Sensitivity analyses on case definition.** The names in bold are the values `case_definition` takes in `analysis_params.toml`, and each names exactly one rule.
 
-Agreement across the three is reported; disagreement is interpreted as misclassification sensitivity, informed by the measured PPV above.
+1. **`primary`:** any drug with a G40 reason code, confirmed as an ASM (cycle H).
+2. **`narrow`:** restrict to ASMs rarely used off-label (levetiracetam, phenytoin, carbamazepine, lacosamide) with a G40 code, testing whether the estimate is sensitive to residual off-label contamination.
+3. **`broad`:** ASM name-list regardless of reason code — the only definition available in cycle G, and the basis of the replication cohort.
+4. **`narrow_nocode`:** the rarely-off-label name restriction *without* the code requirement. Not a definition in its own right, but the form definition 2 has to take in cycle G, where no reason codes exist — the approximation §4.5 calls for. It is named separately rather than letting `narrow` mean one thing in cycle H and another in cycle G.
+
+Agreement across the definitions is reported; disagreement is interpreted as misclassification sensitivity, informed by the measured PPV above.
+
+**Confirmation is recorded, not merely applied.** The drugs judged to be ASMs and the drugs blanked as non-ASMs are both held as lists in `analysis_params.toml`, and ascertainment **fails** if a drug carries a G40 code and appears on neither. Confirmation by an allow-list alone would silently discard any G40-coded drug missing from that list, which is the same incompleteness that makes drug-first selection wrong, displaced one step down the pipeline. A new drug name therefore forces a documented decision rather than disappearing.
 
 ### 4.2 Controls and matching
 
@@ -144,7 +155,7 @@ Cycle G is analysed separately, under the broad (name-list) case definition, and
 
 The second reading is the more valuable, because it is a genuine falsification test that the primary analysis alone cannot provide. It is pre-specified here so that neither outcome can be presented as confirmatory after the fact.
 
-**What is not claimed.** Cycle G is not a nationally representative epilepsy sample, its case group is not an epilepsy case group in the sense cycle H's is, and no combined across-cycle estimate is reported. A sensitivity analysis restricted to the cycle G participants whose ASM is one rarely used off-label (§4.1 definition 2) is reported, as the closest available approximation to a specific definition in that cycle.
+**What is not claimed.** Cycle G is not a nationally representative epilepsy sample, its case group is not an epilepsy case group in the sense cycle H's is, and no combined across-cycle estimate is reported. A sensitivity analysis restricted to the cycle G participants whose ASM is one rarely used off-label (§4.1 definition 4, `narrow_nocode`) is reported, as the closest available approximation to a specific definition in that cycle.
 
 ---
 

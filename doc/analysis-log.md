@@ -23,6 +23,66 @@ Template:
 
 ---
 
+## 2026-09-02 — Case ascertainment rewritten code-first; the spec's primary yield was mislabelled
+
+**Ran:** Rewrote `cohort.find_people_on_asm` as `cohort.find_cases(cycle, definition=)`,
+code-first per methods.md §4.1, with four definitions reading their parameters from
+`analysis_params.toml` through a new `params.py`. This PC, W: drive data.
+
+**Found: the spec's §4.1 primary row was the count before ASM confirmation.** It read
+"Any drug + G40, ASM confirmed — 72 / 56 / 46". 72 is the number of participants carrying
+a G40 code, *before* non-ASMs are blanked. Applying the confirmation step the spec
+requires gives **70 / 54 / 44**. The other three rows of that table reproduce exactly
+(61/47/39, 157/136/115 for H, 123/101/87 for G), so the error is specific to the
+confirmation step. The spec table is corrected and now shows both rows.
+
+Nineteen distinct drug names carry a G40 code in cycle H; sixteen are ASMs. The three
+that are not cost two participants, because a non-ASM was their only G40 prescription:
+
+- **SEQN 75016** — allopurinol coded G40, in a record otherwise of gout, type 2 diabetes
+  and nerve pain. Their gabapentin is coded `M79.2`. A miscode.
+- **SEQN 77740** — alprazolam, `RXDRSC1 = F41.9` (anxiety) with G40 secondary, alongside
+  citalopram and amphetamine.
+- **SEQN 78506** — hydrocodone coded G40, but this participant also has a confirmed ASM
+  with G40, so only the row is blanked.
+
+**Decisions taken by the researcher**, recorded as theirs: gabapentin with a G40 code
+counts as a case (the code is the indication evidence, which is the basis of code-first
+selection, even though gabapentin is excluded from the broad name list as non-specific);
+alprazolam is blanked, while clonazepam, lorazepam and diazepam are retained, since those
+three are used for seizure control and alprazolam is not; and the cycle G approximation
+that §4.5 calls for gets its own name, `narrow_nocode`, rather than letting `narrow` mean
+different things in different cycles.
+
+**Design point worth keeping.** Confirmation by allow-list alone would silently discard
+any G40-coded drug missing from the list — the same incompleteness that makes drug-first
+selection wrong, displaced one step down the pipeline. So every drug observed with the
+code must be on `asm_confirm` or on `non_asm_blanked`, and ascertainment **raises**,
+naming the drug, if one is on neither. A new ASM or a new coding error forces a decision.
+
+**Verification.** Equivalence before refactoring: `definition="broad"` selects exactly the
+participants in the committed `people_with_epilepsy_G.csv` (123) and
+`people_with_epilepsy_H.csv` (157), participant for participant. The identified counts
+were reached twice by independent implementations — a throwaway pandas script and the
+library — agreeing at 70 / 54 / 44 for `primary`, 38 / 31 / 26 for `narrow`. `tests/test_cohort.py`
+adds 25 tests: a nine-row synthetic table whose answer under each definition is derivable
+by hand, the completeness guard, refusal of a code-requiring definition on a cycle with no
+reason-code columns, and a data-backed test pinning 70 / 38 / 157 that skips when the raw
+data is unreachable. Full suite 90 passed.
+
+**Also learned about the released data:** reason codes are three-character ICD-10
+categories (plain `G40`, never `G40.909`) and an absent code is an empty string, not a
+missing value. Every G40 row in cycle H is current use, so `RXDUSE == 1` changes nothing
+for the code-first definitions, though it is still applied.
+
+**Next:** nothing downstream uses the primary definition yet.
+`matching.eligible_participants` accepts `definition=` but still defaults to the legacy
+broad file, and `scripts/build_cohort.py` has no flag for it. That switch changes the
+study population, so it is its own commit and its own decision about the existing
+`freq_match_*` files.
+
+---
+
 ## 2026-09-02 — PAXMIN_H downloaded, converted and verified complete
 
 **Ran:** `scripts/check_data_integrity.py` against both cohorts, after the parallel

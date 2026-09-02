@@ -67,12 +67,18 @@ Ordered by how much damage they do if left.
 
 ### Wrong, not merely missing
 
-- [ ] **Case definition is drug-first and has no reason-code requirement.**
-      `cohort.find_people_on_asm` matches 12 ASM names. Rewrite as code-first with a
-      `definition=` parameter (`primary` = G40 + ASM confirmation, cycle H;
-      `broad` = name-list, for cycle G and for sensitivity; `narrow` = rarely-off-label
-      ASMs) so all three of the spec's §4.1 sensitivity analyses come from one function.
-      Cycle G can only ever serve `broad`.
+- [x] **Case definition is drug-first and has no reason-code requirement.** Done
+      2026-09-02. `cohort.find_cases(cycle, definition=)` is code-first, with four
+      definitions — `primary`, `narrow`, `broad`, `narrow_nocode` — all reading their
+      drug lists from `analysis_params.toml` via the new `params.py`. Ascertainment
+      raises if a G40-coded drug is on neither the ASM nor the blanked list, and raises
+      for a code-requiring definition on a cycle without reason-code columns.
+      `find_people_on_asm` warns and delegates to `broad`, selecting the same
+      participants as before in both cycles. **The spec's §4.1 primary yield was
+      mislabelled** — 72/56/46 was the count *before* non-ASMs were blanked; the
+      confirmed figures are 70/54/44. Corrected in the spec, logged, and pinned by a
+      test. Two open consequences below: the cases are not yet wired into matching, and
+      `analysis_params.toml` is still unread outside `[cohort]`.
 - [ ] **Clock times are stored as linear minutes from midnight.** `m10_midpoint` and
       `l5_midpoint` in `lux_metrics.py`. Any group comparison of `l5_midpoint` reproduces
       the exact error the spec (§8.2) criticises in Tang 2024 and Bailey 2023, because L5
@@ -88,6 +94,17 @@ Ordered by how much damage they do if left.
 
 ### Missing
 
+- [ ] **The new case definitions are not yet the cohort the analysis uses.**
+      `cohort.find_cases` exists and is tested, but `matching.eligible_participants`
+      still defaults to the legacy `people_with_epilepsy_{cycle}.csv` — the `broad`
+      definition — and `scripts/build_cohort.py` has no `--definition` flag. Deliberate:
+      the switch changes the study population, so it is its own commit. Wiring is one
+      argument (`definition=`, already accepted by `eligible_participants`); the work is
+      in deciding what to do with the existing `freq_match_*` files rather than in the
+      code. **Nothing downstream uses the primary definition until this is done.**
+- [ ] **`analysis_params.toml` is read for `[cohort]` only.** `params.py` exists and is
+      the mechanism; every other section is still specification-only, and the literals
+      that contradict it are the night-window and threshold items above.
 - [ ] **Non-wear and valid-day handling.** The PAXLUX route applies none at all — metrics
       span the whole recording, including non-wear. Notebook 09's PAXMIN masking
       (`PAXTSM < 45` or `PAXPREDM == 3`, wear blocks under 1,440 min discarded) is a

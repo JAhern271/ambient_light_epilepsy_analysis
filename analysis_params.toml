@@ -13,17 +13,20 @@
 # examined — the pre-specification in doc/methods.md is what licenses the
 # analysis.
 #
-# WIRING STATUS 2026-08-27: the code does not yet read this file. Values below
-# are the specification; several call sites still carry contradicting literals.
-# Migration is tracked in doc/implementation-status.md. Until that is closed,
-# treat this file as normative and the literals as bugs.
+# WIRING STATUS 2026-09-02: read via ambient_light_epilepsy.params. The
+# [cohort] section is wired up and used by cohort.find_cases. Every other
+# section is still specification only, and several call sites carry
+# contradicting literals. Migration is tracked in
+# doc/implementation-status.md. Until that is closed, treat this file as
+# normative and the literals as bugs.
 
 [cohort]
 # doc/methods.md 4.1, 4.3, 4.5
 primary_cycle = "H"           # 2013-2014; the only cycle with reason-for-use codes
 replication_cycle = "G"       # 2011-2012; broad definition only, reported separately
 min_age = 20
-case_definition = "primary"   # primary | narrow | broad -- see methods.md 4.1
+# primary | narrow | broad | narrow_nocode -- see methods.md 4.1, 4.5
+case_definition = "primary"
 icd10_prefix = "G40"          # epilepsy and recurrent seizures
 
 # Selection is CODE-FIRST: take everyone with icd10_prefix in RXDRSC1-3, then
@@ -36,6 +39,21 @@ asm_confirm = [
     "lacosamide", "clobazam", "clonazepam", "lorazepam", "diazepam",
     "gabapentin", "pregabalin",
 ]
+# Drugs observed carrying a G40 code that are NOT antiseizure medications, and
+# so are blanked (methods.md 4.1, following Terman 2020). This is the record of
+# a manual review, not a filter: cohort.find_cases raises if a drug carries the
+# code and appears on neither this list nor asm_confirm, so a new drug name
+# forces a decision rather than being silently dropped.
+#
+# All three were reviewed on 2026-09-02 against the full prescription record:
+#   allopurinol  gout drug, plainly a miscode -- that participant's record is
+#                gout and diabetes, and their gabapentin is coded M79.2
+#   hydrocodone  opioid; that participant also has a confirmed ASM with G40,
+#                so only the row is blanked, not the person
+#   alprazolam   RXDRSC1 is F41.9 (anxiety) with G40 secondary, alongside
+#                citalopram; not a recognised ASM, unlike clonazepam,
+#                lorazepam and diazepam, which are kept
+non_asm_blanked = ["allopurinol", "alprazolam", "hydrocodone"]
 # Rarely used off-label; the narrow definition (methods.md 4.1, sensitivity 2)
 asm_narrow = ["levetiracetam", "phenytoin", "carbamazepine", "lacosamide"]
 # The 12-name list behind the superseded results. Broad definition only.

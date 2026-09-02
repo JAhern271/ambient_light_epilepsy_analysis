@@ -63,9 +63,18 @@ def bin_age(ages):
     return pd.cut(ages, bins=bins, labels=labels, right=False)
 
 
-def eligible_participants(year, base_path=None):
+def eligible_participants(year, base_path=None, definition=None):
     """
     Apply the inclusion criteria and label the demographics.
+
+    Parameters
+    ----------
+    definition : str, optional
+        Case definition to read, one of ``cohort.DEFINITIONS``. Omitted, the
+        legacy ``people_with_epilepsy_{cycle}.csv`` is used, which holds the
+        drug-first 'broad' definition — kept as the default only so the
+        existing cohort files and results stay reproducible. Pass 'primary'
+        for the specification's case definition (cycle H).
 
     Returns
     -------
@@ -77,7 +86,10 @@ def eligible_participants(year, base_path=None):
     demo = nhn.load_partial_demo(year, base_path)
     adults = demo[demo["age"] >= MIN_AGE]
 
-    pwe_index = pd.Index(ch.load_pwe_seqn(year, base_path).values.reshape(-1))
+    if definition is None:
+        pwe_index = pd.Index(ch.load_pwe_seqn(year, base_path).values.reshape(-1))
+    else:
+        pwe_index = ch.load_cases(year, definition, base_path)
 
     # PAXLDAY is stored as a string, so compare it as one
     header = nhn.load_PAXHD(year, base_path)

@@ -59,20 +59,50 @@ collection periods, not meteorological seasons.
 
 ### Epilepsy status — `RXQ_RX`
 
-A participant is classified as having epilepsy if `RXDUSE == 1` (medication taken in the
-past 30 days) for any drug in `RXDDRUG` matching, case-insensitively:
+`cohort.find_cases(cycle, definition=...)` implements four definitions. All of them
+require `RXDUSE == 1` (medication taken in the past 30 days), and all take their drug
+lists and the ICD-10 prefix from the `[cohort]` section of `analysis_params.toml`. See
+methods.md §4.1 for why, and `cohort.py` for the mechanics.
 
-    phenytoin, carbamazepine, valproic acid, divalproex sodium, phenobarbital,
-    primidone, ethosuximide, levetiracetam, lamotrigine, topiramate,
-    oxcarbazepine, zonisamide
+| `definition` | Reason code required | Drug list | Cycles |
+|---|---|---|---|
+| `primary` | `G40` in `RXDRSC1–3` | `asm_confirm` (19 names) | H only |
+| `narrow` | `G40` in `RXDRSC1–3` | `asm_narrow` (4 names) | H only |
+| `broad` | none | `asm_broad` (12 names) | G and H |
+| `narrow_nocode` | none | `asm_narrow` | G and H |
 
-Gabapentin and pregabalin are **deliberately excluded** as they are too frequently
-prescribed for non-epilepsy indications to be specific.
+Selection is **code-first**: the drug list confirms, it does not select. The reason code
+and the drug must be on the **same prescription row**, since the code is the indication
+for that prescription and not for the participant's whole medication list.
 
-This yields 123 PWE before the age and recording-validity filters.
+Ascertainment **raises** if a drug carries a `G40` code and appears on neither
+`asm_confirm` nor `non_asm_blanked`, so an unreviewed drug name stops the run instead of
+being silently dropped.
 
-> The `RXQ_RX_H` table contains a `RXDRSD1` column that fails to convert to pandas, so it
-> is dropped at load time for cycle H only.
+Identified counts before the age and recording-validity filters, as of 2026-09-02:
+`primary` 70 (H), `narrow` 38 (H), `broad` 157 (H) and 123 (G). These are pinned by a
+test in `tests/test_cohort.py`, which skips when the raw data is unreachable.
+
+**Notes on the released data.** Reason codes are stored at three-character ICD-10
+category level — plain `G40`, never `G40.909` — and an absent code is an **empty string**,
+not a missing value. Both are normalised at load time; the code requirement is a prefix
+test so that a fuller code in a later release would still match. In cycle H every G40 row
+happens to be current use, so the `RXDUSE` filter changes nothing for the code-first
+definitions, but it is applied regardless.
+
+`RXQ_RX_G` carries **no reason-for-use variables at all**, so `primary` and `narrow` raise
+for cycle G rather than quietly dropping the requirement.
+
+> The `RXQ_RX_H` table contains a `RXDRSD1` column that fails to convert to pandas.
+> `load_prescriptions` reads only the columns ascertainment needs, which sidesteps it in
+> both cycles; the free-text descriptions it holds duplicate the codes.
+
+**Superseded.** Before 2026-09-02 the only definition was the drug-first `asm_broad`
+name list with no reason-code requirement, reached through
+`cohort.find_people_on_asm`. That function is retained, warns, and delegates to
+`definition="broad"`; it selects the same participants as before in both cycles, verified
+against the committed files. It has a positive predictive value of 38.9% against G40 in
+cycle H, so it is not the primary definition and everything in `results/` derives from it.
 
 ### Recording validity — `PAXHD`
 
@@ -212,7 +242,8 @@ Written to `data/processed/`.
 
 | File | Contents |
 |---|---|
-| `people_with_epilepsy_{cycle}.csv` | SEQN of all identified PWE |
+| `cases_{cycle}_{definition}.csv` | SEQN of cases under one case definition, with a `.provenance.json` sidecar recording the drug lists used |
+| `people_with_epilepsy_{cycle}.csv` | SEQN of all identified PWE. Legacy: the drug-first `broad` definition. Kept so existing results reproduce |
 | `freq_match_pwe_{cycle}.csv` | SEQN of PWE entering the matched analysis |
 | `freq_match_control_{cycle}.csv` | SEQN of their frequency-matched controls |
 
