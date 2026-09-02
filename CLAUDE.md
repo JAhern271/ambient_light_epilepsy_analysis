@@ -70,3 +70,33 @@ and two directory layouts. Raw NHANES data is never committed.
 - Every run writes a `.provenance.json` sidecar (git commit, timestamp, parameters,
   versions). Results go to dated directories; do not overwrite a previous run.
 - Add an `analysis-log.md` entry for anything whose result you would want to explain later.
+
+## Working practices
+
+Obligations for whoever is doing the work, human or model. The failure mode in this
+project is a plausible wrong number reaching a manuscript, not a crash.
+
+- **Work one `implementation-status.md` item per session**, and finish with a commit, a
+  log entry, and a ticked box. Keep diffs small enough to be read; if a change is too
+  large to review, split it.
+- **Never change a spec parameter, threshold or endpoint after outcomes have been seen.**
+  If asked to, say plainly that it would breach pre-specification and offer to record it
+  as a labelled post hoc analysis instead. Do not quietly accommodate it.
+- **Before implementing a new or changed metric, supply a synthetic input whose expected
+  answer is derivable by hand**, and get agreement on it. If no such example can be
+  written, the definition is not yet clear enough to implement.
+- **For any number destined for the manuscript, give an independent second route to it.**
+  One computation is not a result.
+- **Prove equivalence before refactoring.** Promoting code out of a notebook must
+  reproduce the prior output participant-for-participant first; only then change behaviour.
+- **Verify premises against the data before asserting them.** Both methods documents once
+  asserted an ascertainment approach that cycle G cannot support, because nobody opened
+  the file. Fluent prose about the data is not evidence about the data.
+- **Prefer plain code over clever code**, and write it to be maintainable by someone who
+  did not write it. If an explanation requires understanding the implementation, the
+  implementation is wrong for this context.
+- **Do not touch `results/`, and do not rerun anything that overwrites a previous run,
+  without being asked explicitly.**
+- **Scientific judgment belongs to the researcher.** For choices of estimand, endpoints,
+  covariate roles or scope, present options and consequences rather than deciding; record
+  the decision and its reasoning in `analysis-log.md` as theirs.
