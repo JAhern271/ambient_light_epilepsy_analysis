@@ -23,6 +23,89 @@ Template:
 
 ---
 
+## 2026-09-03 — Valid-day rule settled at D=4/H=20; it CUTS the cohort by 16%, the opposite of what was predicted
+
+**Ran:** `scripts/build_validity.py --cohort H|G --min-valid-days 4 --min-wear-hours 20`,
+dry run then for real. Reads both PAXMIN tables end to end (88,223,479 and 78,126,856
+rows). This PC, W: drive data. First execution of `wear.valid_recordings` on real data.
+155 tests pass. `results/` untouched; `freq_match_*.csv` deliberately not regenerated.
+
+**Output:** `data/processed/valid_recordings_{H,G}.csv` with provenance sidecars.
+
+**Decision taken by the researcher:** D = 4 valid days, H = 20 hours, following
+[Xiao_2023] — the values carried as provisional since 2026-09-02. Both remain **required
+arguments with no defaults** by explicit choice, so every run states the rule it applied
+and the sensitivity runs read identically to the primary one.
+
+**Found: the rule is far stricter than the spec assumed, and in the opposite direction.**
+
+| | cycle H | cycle G |
+|---|---|---|
+| participants assessed | 7,776 | 6,917 |
+| valid, superseded 9-day rule | 7,537 | 6,608 |
+| **valid, §5.2** | **6,385** | **5,926** |
+| admitted by the change | +74 | +125 |
+| **excluded by the change** | **−1,226** | **−807** |
+| net | −1,152 | −682 |
+
+Case-level, which is what actually constrains this study:
+
+| definition | cycle | 9-day rule | §5.2 | change |
+|---|---|---|---|---|
+| **primary** | H | 44 | **37** | **−7** |
+| narrow | H | 26 | 22 | −4 |
+| broad | H | 115 | 97 | −18 |
+| broad | G | 87 | 81 | −6 |
+| `narrow_nocode` | G | 35 | 32 | −3 |
+| control pool | H | 4,601 | 3,984 | −617 |
+| control pool | G | 4,385 | 3,951 | −434 |
+
+**Why the spec's prediction failed.** §4.1 said the yield should be "approximately 40–46",
+reasoning that §5.2 is *looser* than the nine-day rule because it drops the partial first
+and last days. §5.2 is indeed looser about how many days must be **recorded** — it admits
+74 participants who stopped early — but far stricter about how much of each day must be
+**worn**. Non-wear is invisible to a header flag, so no reasoning from `PAXLDAY` could have
+reached this; it had to be measured. §4.1 and §7 corrected; the yield table gains a
+measured §5.2 column.
+
+**Cross-checks. Every one passed before the numbers were believed.**
+
+1. Participants assessed 7,776 (H) and 6,917 (G), and `header_only_valid` 7,537 and 6,608
+   — all four match counts derived from `PAXHD` outside `wear.py`.
+2. Candidate days per participant for H: 7,522 at seven, 147 below four — identical to the
+   independent noon-boundary arithmetic done on 2026-09-03 before the module existed.
+   Candidate days are pure geometry and independent of D and H, so this isolates the day
+   construction from the threshold.
+3. Stored `meets_criterion` recomputed from `n_valid_days >= 4`: 7,776/7,776 and
+   6,917/6,917 agree.
+4. **External.** 1,391 of 7,776 cycle-H participants fall below four valid days, 17.9%.
+   [Xiao_2023] used this same rule on 2011–2014 and report n=7,013; against ~14,700 PAM
+   participants of whom roughly 60% are adults, that implies ~20% attrition from validity
+   plus missing covariates. Consistent, and it comes from outside this repository.
+5. Spot-checked eight participants credited with 0 valid days by recomputing from PAXMIN:
+   retained fractions of 4.3% to 60.2%, and no candidate day reaching 1,200 minutes. They
+   are genuine non-wearers, not an artefact. (One of them is SEQN 73557, whose *geometry*
+   the `late_start` test fixture borrows — the fixture copies its 11,529-minute shape and
+   16:30 start, not its wear pattern.)
+
+**One number that looks like a finding but is tautological:** all 1,226 (H) and 807 (G)
+participants excluded by the change have `PAXLDAY == 9`. That is definitional — a
+participant with `PAXLDAY < 9` was already excluded by the old rule, so cannot be
+"excluded by the change". Recorded so it is not later read as evidence about wear.
+
+**Pre-specification.** The thresholds were fixed before the yield was known and are **not**
+revised now that it is. Whether the findings depend on them is what the pre-specified
+valid-day sensitivity analyses are for (§5.2, §8.4 item 2): Su 2022 at D=3/H=16 needs no
+new code, only a run.
+
+**Next:** the case-definition wiring, which is the remaining half of "nothing downstream
+uses the primary definition". `scripts/build_cohort.py --validity spec --cohort H` now runs
+end to end, but with `definition=None` it still uses the legacy drug-first `broad` list and
+reports 97 PWE rather than 37. Switching the validity rule and the case definition in one
+step would make the cohort change uninterpretable, so that stays a separate commit.
+
+---
+
 ## 2026-09-03 — `min_valid_seconds` deleted; `PAXPREDM == 4` retained; both decisions written into §5.1
 
 **Ran:** Removed `validity.min_valid_seconds` from `analysis_params.toml` and the

@@ -5,10 +5,12 @@ A wrong wear threshold produces a cohort of the wrong size and nothing broken
 to notice, so nearly every expected value here is derived on paper from the
 recording's structure rather than read off what the code currently returns.
 
-The two valid-day thresholds are NOT settled -- the researcher reserved the
-choice on 2026-09-02, see doc/implementation-status.md. The tests are therefore
-parameterised on `min_wear_hours` and `min_valid_days` and assert that the rule
-holds for whatever values it is given, so settling them changes no test here.
+The two valid-day thresholds were settled on 2026-09-03 at D=4 valid days and
+H=20 hours, following Xiao 2023. They remain REQUIRED arguments with no
+defaults, so every run states the rule it used and the sensitivity rules read
+identically to the primary one. The tests below are parameterised on
+`min_wear_hours` and `min_valid_days` and assert the rule holds for whatever
+values it is given, which is why settling them changed no test in this file.
 
 Recording geometry used throughout
 ----------------------------------
@@ -724,3 +726,89 @@ def test_header_only_validity_reproduces_the_superseded_rule():
     valid = wear.header_only_validity(header)
 
     assert list(valid) == [1.0, 4.0]
+
+
+# ---------------------------------------------------------------------------
+# The validity table on disk
+# ---------------------------------------------------------------------------
+
+def a_validity_table():
+    """
+    A small participant-level table in the shape `valid_recordings` returns.
+
+    `meets_criterion` and `header_only_valid` are genuine booleans, as they are
+    coming out of `summarise_participant`.
+    """
+    return pd.DataFrame(
+        {
+            "PAXFTIME": ["16:30:00", "16:30:00", " 8:57:00", "12:30:00"],
+            "PAXLDAY": ["9", "6", "9", "5"],
+            "n_days_recorded": [9, 6, 9, 5],
+            "n_candidate_days": [7, 4, 7, 3],
+            "n_valid_days": [7, 4, 2, 3],
+            "minutes_retained": [10080, 5760, 2880, 4320],
+            "meets_criterion": [True, True, False, False],
+            "header_only_valid": [True, False, True, False],
+        },
+        index=pd.Index([73557.0, 73558.0, 73559.0, 73560.0], name="SEQN"),
+    )
+
+
+def test_validity_table_round_trips_through_csv(tmp_path, monkeypatch):
+    """
+    save_validity -> load_validity -> valid_seqns must preserve exactly which
+    participants are admitted.
+
+    This is pinned because the failure mode is silent and catastrophic rather
+    than noisy. `meets_criterion` is written as the text "True"/"False", and
+    `valid_seqns` calls `.astype(bool)` on it. pandas infers a bool dtype on
+    read, so it works — but on an object column of those strings `.astype(bool)`
+    returns True for *every* row, because any non-empty string is truthy. The
+    whole cohort would be admitted, the file would look right, and nothing
+    would raise.
+
+    Note `PAXLDAY` is written as a string and read back as int64, so the
+    assertions below are on the admitted SEQN set rather than on that column.
+    """
+    monkeypatch.setenv("ALE_DATA_ROOT", str(tmp_path))
+    monkeypatch.delenv("ALE_PROFILE", raising=False)
+
+    table = a_validity_table()
+    expected = set(wear.valid_seqns(table))
+
+    path = wear.save_validity(table, "X")
+    assert path.exists()
+
+    reloaded = wear.load_validity("X")
+
+    assert reloaded["meets_criterion"].dtype == bool
+    assert set(wear.valid_seqns(reloaded)) == expected == {73557.0, 73558.0}
+    assert reloaded.index.name == "SEQN"
+
+
+def test_valid_seqns_would_catch_a_string_boolean_column():
+    """
+    Guards the reasoning in the test above rather than the code: it documents
+    that a text column really does admit everyone, so the round-trip assertion
+    is known to be load-bearing and not decoration.
+    """
+    table = a_validity_table()
+    as_text = table.assign(
+        meets_criterion=table["meets_criterion"].map({True: "True", False: "False"})
+    )
+
+    assert len(wear.valid_seqns(table)) == 2
+    assert len(wear.valid_seqns(as_text)) == 4      # every row, silently
+
+
+def test_a_missing_validity_table_says_how_to_build_it(tmp_path, monkeypatch):
+    """
+    The error names the script and the two thresholds, because the thresholds
+    are the researcher's decision and this file is the record of which were
+    used. Falling back to a rule of its own would hide that.
+    """
+    monkeypatch.setenv("ALE_DATA_ROOT", str(tmp_path))
+    monkeypatch.delenv("ALE_PROFILE", raising=False)
+
+    with pytest.raises(FileNotFoundError, match="build_validity"):
+        wear.load_validity("X")

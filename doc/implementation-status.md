@@ -102,16 +102,24 @@ Ordered by how much damage they do if left.
       argument (`definition=`, already accepted by `eligible_participants`); the work is
       in deciding what to do with the existing `freq_match_*` files rather than in the
       code. **Nothing downstream uses the primary definition until this is done.**
+- [ ] **Cohort files are still built on the legacy case definition.** With validity now
+      wired, `scripts/build_cohort.py --validity spec --cohort H` runs end to end, but
+      `definition=None` still means the drug-first `broad` list, so its dry run reports 97
+      PWE rather than 37. Switching the case definition and switching the validity rule in
+      one step would make the resulting cohort change uninterpretable, so the definition
+      wiring stays its own commit — see the item above it. `freq_match_*.csv` deliberately
+      **not** regenerated.
 - [ ] **`analysis_params.toml` is read for `[cohort]` and `[validity]` only.** `params.py`
       is the mechanism; `[cohort]` was wired up 2026-09-02 and `[validity]` on 2026-09-03
       by `wear.py`. `[light]`, `[sleep]`, `[matching]`, `[survey]` and `[multiplicity]` are
       still specification-only, and the literals that contradict them are the night-window
-      and threshold items above. Note the two provisional `[validity]` thresholds are
-      deliberately *not* read as defaults — see the valid-day item below.
+      and threshold items above. Note `min_valid_days` and `min_wear_hours` are settled
+      but deliberately *not* read as defaults — see the valid-day item below.
 - [x] **Non-wear and valid-day handling.** Done 2026-09-03, together with the
       participant-level validity item below. New `wear.py` implements §5.1 and §5.2:
       quality flag (`PAXQFM > 0`, equivalently any `PAXFLGSM` letter — verified to agree
-      on all 88,223,479 rows), `PAXPREDM` non-wear, negative `PAXMTSM`, `PAXTSM` floor,
+      on all 88,223,479 rows), `PAXPREDM` non-wear and negative `PAXMTSM` (the `PAXTSM`
+      floor was deleted on the same day as redundant),
       light and activity masked jointly from one array, noon-to-noon days with the partial
       first and last dropped, and the D-days-at-H-hours rule. 58 tests written first,
       against synthetic recordings with hand-derived answers, and checked by injecting
@@ -121,20 +129,31 @@ Ordered by how much damage they do if left.
       with independent `PAXHD` arithmetic for 30 participants across the whole `PAXFTIME`
       range. §5.1 masks 13.9% of minutes in cycle H. See the 2026-09-03 entry in
       [analysis-log.md](analysis-log.md).
-      - [ ] **The valid-day thresholds are still NOT settled — this is the live item.**
-            `min_valid_days = 4` and `min_wear_hours = 20` follow [Xiao_2023] but the
-            researcher reserved the choice pending a literature review (2026-09-02).
-            Both are marked provisional in `analysis_params.toml` and are **required
-            arguments with no defaults**: `scripts/build_validity.py` will not run
-            without them, and the tests are parameterised on H ∈ {16, 20, 22} and
-            D ∈ {3, 4, 5} rather than pinning 4/20, so settling them changes no test.
-            **Ask the researcher for D and H before building or filtering a cohort.**
-      - [ ] **Nothing has been run against a real cohort yet**, for the reason above. Once
-            D and H are set: run `scripts/build_validity.py`, then report the cohort
-            change in **both** directions before anything downstream uses it. From the
-            header alone, up to 92 participants with `PAXLDAY < 9` have ≥ 4 candidate days
-            and would be newly admitted; an unknown number with all nine days but heavy
-            non-wear will now be excluded, which the old rule could not detect.
+      - [x] **Valid-day thresholds settled 2026-09-03: D = 4, H = 20**, following
+            [Xiao_2023]. Recorded in `analysis_params.toml` but deliberately still
+            **required arguments with no defaults**, so every run states the rule it
+            applied and the sensitivity runs read identically to the primary one. Do not
+            "fix" that by adding defaults. Now that outcomes are being produced against
+            these values, changing either breaches pre-specification.
+      - [x] **Validity tables built for both cycles**, 2026-09-03.
+            `valid_recordings_{H,G}.csv` with provenance sidecars, in `data/processed`.
+            **The cohort change is the opposite of what this item assumed.** It said
+            switching "recovers cases"; it recovers a few and removes far more, because
+            the old rule could not see non-wear:
+
+            | | cycle H | cycle G |
+            |---|---|---|
+            | assessed | 7,776 | 6,917 |
+            | valid, superseded 9-day rule | 7,537 | 6,608 |
+            | valid, §5.2 | **6,385** | **5,926** |
+            | admitted by the change | +74 | +125 |
+            | excluded by the change | **−1,226** | **−807** |
+
+            Case-level, which is what constrains the study: **primary 44 → 37** in cycle
+            H, narrow 26 → 22, broad 115 → 97; cycle G broad 87 → 81, `narrow_nocode`
+            35 → 32. Control pool 4,601 → 3,984 (H) and 4,385 → 3,951 (G).
+            §4.1 and §7 corrected against the measured 37 — the spec had predicted
+            40–46 and was wrong in direction.
       - [x] **`PAXPREDM == 4` ("unknown") is kept.** Decided 2026-09-03. 2,946,459
             minutes, 3.3% of the table. These are minutes of valid data with an uncertain
             *label*, not absent data, and the quality-flag rule already removes those the

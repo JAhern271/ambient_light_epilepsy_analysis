@@ -13,12 +13,15 @@
 # examined — the pre-specification in doc/methods.md is what licenses the
 # analysis.
 #
-# WIRING STATUS 2026-09-02: read via ambient_light_epilepsy.params. The
-# [cohort] section is wired up and used by cohort.find_cases. Every other
-# section is still specification only, and several call sites carry
-# contradicting literals. Migration is tracked in
-# doc/implementation-status.md. Until that is closed, treat this file as
-# normative and the literals as bugs.
+# WIRING STATUS 2026-09-03: read via ambient_light_epilepsy.params.
+#   [cohort]    wired up, used by cohort.find_cases
+#   [validity]  wired up, used by wear.py -- except min_valid_days and
+#               min_wear_hours, which are recorded here but passed explicitly
+#               by every caller on purpose (see that section)
+#   everything else is still specification only, and several call sites carry
+#   contradicting literals -- the night window most seriously.
+# Migration is tracked in doc/implementation-status.md. Until it is closed,
+# treat this file as normative and the literals as bugs.
 
 [cohort]
 # doc/methods.md 4.1, 4.3, 4.5
@@ -66,18 +69,22 @@ asm_broad = [
 [validity]
 # doc/methods.md 5.1, 5.2. Implemented by ambient_light_epilepsy.wear.
 #
-# PROVISIONAL, 2026-09-03: min_valid_days and min_wear_hours are NOT settled.
-# The researcher reserved the choice pending a literature review, because
-# there is no consensus rule -- methods.md 5.2 tabulates four published rules
-# on these same data that differ materially, and Tang 2024 has none at all.
-# The two values below follow Xiao 2023 and are placeholders for the decision.
+# SETTLED 2026-09-03 by the researcher, after the literature review reserved
+# on 2026-09-02: D = 4 valid days, H = 20 hours, following Xiao 2023. There is
+# no consensus rule -- methods.md 5.2 tabulates four published rules on these
+# same data that differ materially, and Tang 2024 has none at all -- so this is
+# a choice, and the sensitivity analyses below are how it is tested.
 #
-# They are therefore NOT read as defaults: wear.py takes both as required
-# arguments, and scripts/build_validity.py requires them on the command line,
-# so no call site can adopt them silently. Everything else in this section is
-# settled and is read from here.
-min_valid_days = 4            # PROVISIONAL. sensitivity: 5 (Johnson 2023), 3 (Su 2022)
-min_wear_hours = 20           # PROVISIONAL, per valid day; sensitivity: 16 (Su 2022)
+# The two values are recorded here but are deliberately NOT read as defaults.
+# wear.py takes both as required arguments and scripts/build_validity.py
+# requires them on the command line, so every run states the rule it applied,
+# the sensitivity runs read identically to the primary one, and a provenance
+# sidecar can never be ambiguous about which rule produced a file. That is by
+# design and should not be "fixed"; see doc/analysis-log.md 2026-09-03.
+#
+# Never change either value now that outcomes are being produced against them.
+min_valid_days = 4            # sensitivity: 5 (Johnson 2023), 3 (Su 2022)
+min_wear_hours = 20           # per valid day; sensitivity: 16 (Su 2022)
 day_boundary_hour = 12        # noon-to-noon days, so a night falls in one day
 drop_partial_first_last = true    # first and last noon-to-noon day are partial
 nonwear_pred_code = 3         # PAXPREDM: predicted non-wear. 2 (sleep) and 4

@@ -15,6 +15,7 @@
 
 | Date | Change |
 |---|---|
+| 2026-09-03 | §4.1 yield table gains a measured column for the §5.2 validity rule, and the primary count is corrected from a predicted "40–46" to a measured **37**. The prediction was wrong in direction: §5.2 is looser about days recorded but much stricter about wear per day, and removes 16% of the population the superseded nine-day rule admitted. §4.2 and §7 restated on the measured counts; the power statement is deferred to the effective sample size after matching. No parameter or endpoint changed. |
 | 2026-09-03 | §5.1 made explicit rather than changed, on implementing it: the quality flag variable is named (`PAXFLGSM` / `PAXQFM`), `PAXPREDM` codes 2 and 4 are stated as retained with the reasoning, and `PAXTSM` is stated as not an exclusion. No rule changed; all three were already what §5.1 specified, and both clarifications concern a large enough share of minutes to be worth fixing in writing. §5.2 unchanged, but note its two thresholds are **not settled** — see [implementation-status.md](implementation-status.md). |
 | 2026-09-02 | §4.1 measured-yield table corrected: the row labelled "any drug + G40, ASM confirmed" (72 / 56 / 46) was in fact the count *before* non-ASMs were blanked. With the confirmation step the specification requires, the primary definition yields **70 / 54 / 44**. Both rows are now shown. No definition changed; the label was wrong. `narrow_nocode` named as a fourth definition for the cycle G approximation §4.5 already described in prose (§4.1, §4.5). |
 | 2026-08-27 | Scope narrowed to cycle H for the primary analysis, after `RXQ_RX_G` was found to carry no reason-for-use variables (§4.1). Cycle G becomes a labelled broad-definition replication cohort (§4.5). Case ascertainment restructured as code-first. Yield and power restated on measured counts (§4.1, §7). Sleep derivation contradiction between §6.6 and §9 resolved in favour of GGIR. Software split between Python and R (§9). Parameter values moved to `analysis_params.toml`. |
@@ -87,20 +88,30 @@ NHANES contains no direct epilepsy or seizure item in the medical conditions que
 
 **Measured yield.** Counts below are from the released data, restricted to current-use prescriptions (`RXDUSE == 1`), then to age ≥ 20, then to a valid recording.
 
-| Definition | Cycle | Identified | Age ≥ 20 | + valid recording |
-|---|---|---|---|---|
-| **Any drug + G40, ASM confirmed** (primary) | H | **70** | **54** | **44** |
-| Any drug + G40, *before* ASM confirmation | H | 72 | 56 | 46 |
-| ASM name-list + G40 | H | 61 | 47 | 39 |
-| G40 + ASMs rarely used off-label (narrow) | H | 38 | 31 | 26 |
-| ASM name-list only (broad) | H | 157 | 136 | 115 |
-| ASM name-list only (broad) | G | 123 | 101 | 87 |
+| Definition | Cycle | Identified | Age ≥ 20 | + valid, superseded 9-day rule | + valid, **§5.2** |
+|---|---|---|---|---|---|
+| **Any drug + G40, ASM confirmed** (primary) | H | **70** | **54** | 44 | **37** |
+| Any drug + G40, *before* ASM confirmation | H | 72 | 56 | 46 | not measured |
+| ASM name-list + G40 | H | 61 | 47 | 39 | not measured |
+| G40 + ASMs rarely used off-label (narrow) | H | 38 | 31 | 26 | **22** |
+| ASM name-list only (broad) | H | 157 | 136 | 115 | **97** |
+| ASM name-list only (broad) | G | 123 | 101 | 87 | **81** |
+| Narrow name-list, no code (`narrow_nocode`) | G | 42 | 37 | 35 | **32** |
+
+The final column is the rule this document specifies, measured on 2026-09-03 at
+`min_valid_days` = 4 and `min_wear_hours` = 20. It is the operative one; the
+superseded column is retained only because every figure in `results/` was produced
+under it.
 
 **On the confirmation step.** Nineteen distinct drug names carry a G40 code in cycle H. Sixteen are ASMs; three are not — allopurinol, hydrocodone and alprazolam — and are blanked. Two participants are lost by this, because a non-ASM was their only G40-coded prescription: one whose allopurinol is coded G40 in a record otherwise of gout and diabetes (their gabapentin is coded `M79.2`), and one whose alprazolam carries `F41.9` primary with G40 secondary alongside citalopram. Clonazepam, lorazepam and diazepam *are* retained, since all three are used for seizure control; alprazolam is not. The hydrocodone participant also has a confirmed ASM with G40, so only the row is blanked, not the person. Gabapentin with a G40 code is retained: the code is the indication evidence, which is the whole basis of code-first selection, even though gabapentin is excluded from the broad name list as non-specific.
 
 An earlier version of this table gave 72 / 56 / 46 for the primary row. That was the count before confirmation, mislabelled; the definition itself is unchanged.
 
-The primary definition yields **approximately 40–46 analysable cases**: 44 under the validity rule the code currently applies (`PAXSTS == 1` and all nine days present) and 46 under `PAXSTS == 1` alone. The rule this document actually specifies in §5.2 is not yet implemented, so its yield is not yet measured; it is looser than the nine-day requirement, so it should fall between these. The range is consistent with [Tang_2024]'s 53 in the same cycle under a definition with no accelerometry validity requirement and no age restriction. Precision, not sample size, is the binding constraint on this study (§7).
+The primary definition yields **37 analysable cases** under §5.2, measured 2026-09-03.
+
+An earlier version of this section predicted "approximately 40–46", reasoning that §5.2 is *looser* than the nine-day requirement because it drops the partial first and last days, so its yield should sit between the 44 obtained under `PAXSTS == 1` with all nine days present and the 46 under `PAXSTS == 1` alone. **That reasoning was wrong, and in the opposite direction.** §5.2 is looser about how many days a participant must have *recorded*, but far stricter about how much of each day must be *worn*: requiring 20 h of retained wear on four separate days removes 1,226 of the 7,537 cycle-H participants the nine-day rule admitted — 16% of the eligible population — while admitting only 74 who stopped recording early. Non-wear is invisible to a header flag, which is why no amount of reasoning from `PAXLDAY` could have anticipated this; it had to be measured.
+
+The 37 is below [Tang_2024]'s 53 in the same cycle, as expected: they applied no accelerometry validity requirement and no age restriction. Precision, not sample size, is the binding constraint on this study (§7).
 
 **Quantified misclassification, reported as a finding.** In cycle H the broad definition has a **positive predictive value of 38.9% against the G40 requirement** (61 of 157 name-list cases report epilepsy as the indication). The 96 discordant cases are dominated by topiramate for migraine (`G43`, n=26) and divalproex or lamotrigine for mood disorders (`F31.9` n=23, `F39` n=19, `F32.9` n=15) — precisely the off-label pattern the literature anticipates but has never quantified in NHANES. This estimate is reported in its own right: it is the first NHANES-specific quantification of misclassification from ASM-based epilepsy ascertainment, and it is what licenses the interpretation of the cycle G replication (§4.5).
 
@@ -119,7 +130,7 @@ Agreement across the definitions is reported; disagreement is interpreted as mis
 
 Eligible controls are all other participants meeting the accelerometry validity criteria (§4.3). From this pool, a matched comparison group is constructed by **full matching on the propensity score** (§8.1). No exclusion by ASM use is applied under the primary definition, but a sensitivity analysis excludes control participants taking any ASM for a non-G40 indication, since these individuals may share medication-related effects without having epilepsy.
 
-**Why matching rather than regression adjustment alone.** With approximately 40–46 cases against a control pool of roughly 4,800, the two groups will differ substantially on demographic and socioeconomic characteristics. Relying on regression alone to correct imbalance of that magnitude requires extrapolation beyond the region where cases and controls overlap, and correct specification of the covariate–outcome relationship across that range.
+**Why matching rather than regression adjustment alone.** With 37 cases against a control pool of roughly 3,980 (§4.1), the two groups will differ substantially on demographic and socioeconomic characteristics. Relying on regression alone to correct imbalance of that magnitude requires extrapolation beyond the region where cases and controls overlap, and correct specification of the covariate–outcome relationship across that range.
 
 This is also the design convention in comparable work. Large-cohort accelerometry studies with common exposures use whole-cohort regression without matching, but studies of rare neurological conditions match: [Bailey_2023] compared 241 dystonia cases with 964 matched controls in UK Biobank. The case count here is smaller still, placing this study firmly in the matched camp.
 
@@ -295,7 +306,11 @@ Two published alternatives to GGIR are equally defensible and are noted here in 
 
 ## 7. Sample size and power
 
-No formal a priori sample size calculation is possible, as the case count is fixed by the survey. The primary analysis has **approximately 40–46 cases** against a control pool of roughly 4,800 (§4.1), so power is dominated by the case count and the study can reliably detect only moderate-to-large standardised differences — on the order of Cohen's *d* ≥ 0.45 at 80% power, two-sided α = 0.05, before any design-effect inflation. Findings are framed as hypothesis-generating rather than definitive.
+No formal a priori sample size calculation is possible, as the case count is fixed by the survey. The primary analysis has **37 cases** against a control pool of roughly **3,980** (§4.1), so power is dominated by the case count and the study can reliably detect only moderate-to-large standardised differences. Findings are framed as hypothesis-generating rather than definitive.
+
+**Revised down from the earlier estimate.** This section previously stated 40–46 cases and a minimum detectable Cohen's *d* of about 0.45 at 80% power, two-sided α = 0.05. The measured count is 37 (§4.1). Because the minimum detectable standardised difference scales with 1/√(n cases), dropping from 44 to 37 inflates it by √(44/37), about **9%**. The figure actually reported must be computed from the **effective sample size after full matching** (§8.1), not from the raw case count, so it is not restated as a single number here.
+
+The case count fell because §5.2 is stricter than the rule assumed when this section was written, not because ascertainment changed — see §4.1. **The threshold was fixed before the yield was known and is not revised now that it is**; whether the findings depend on it is answered by the pre-specified valid-day sensitivity analyses (§5.2, §8.4 item 2), which is what those exist for.
 
 Three consequences follow, and each is a design choice made because of the case count rather than in spite of it.
 

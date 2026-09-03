@@ -299,13 +299,34 @@ Written to `data/processed/`.
 
 | File | Contents |
 |---|---|
+| `valid_recordings_{cycle}.csv` | One row per participant: the methods.md 5.2 verdict, with a `.provenance.json` sidecar recording the two thresholds used |
 | `cases_{cycle}_{definition}.csv` | SEQN of cases under one case definition, with a `.provenance.json` sidecar recording the drug lists used |
 | `people_with_epilepsy_{cycle}.csv` | SEQN of all identified PWE. Legacy: the drug-first `broad` definition. Kept so existing results reproduce |
 | `freq_match_pwe_{cycle}.csv` | SEQN of PWE entering the matched analysis |
 | `freq_match_control_{cycle}.csv` | SEQN of their frequency-matched controls |
 
+### `valid_recordings_{cycle}.csv`
+
+Produced by `scripts/build_validity.py`, read by `wear.load_validity`, and turned into an
+eligible-SEQN list by `wear.valid_seqns`. Built at **D = 4 valid days, H = 20 hours**
+(settled 2026-09-03). Columns:
+
+| Column | Meaning |
+|---|---|
+| `PAXFTIME`, `PAXLDAY` | Copied from `PAXHD` for context |
+| `n_days_recorded` | Noon-to-noon days the recording touches |
+| `n_candidate_days` | Of those, days not dropped as a partial first or last |
+| `n_valid_days` | Of those, days with at least `min_wear_hours` of retained wear |
+| `minutes_retained` | Total minutes surviving 5.1 |
+| `meets_criterion` | `n_valid_days >= min_valid_days`. **This is the inclusion flag** |
+| `header_only_valid` | The superseded `PAXSTS == 1 and PAXLDAY == '9'` verdict, carried so the change of rule can be tabulated in both directions |
+
+Note `meets_criterion` is written as text and relies on pandas inferring a bool dtype on
+read; an object column of `"True"`/`"False"` would make `valid_seqns` admit **everyone**
+without raising, so a test pins the round trip.
+
 Controls are frequency matched on age band, sex, race/ethnicity, season and PIR band,
-among adults (age ≥ 20) with a valid 9-day recording.
+among adults (age ≥ 20) with a valid recording.
 
 ## Analysis output
 
