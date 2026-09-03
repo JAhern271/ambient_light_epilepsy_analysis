@@ -5,13 +5,18 @@ Build the study cohort: identify cases and select frequency-matched controls.
 This produces the freq_match_*.csv files that every downstream analysis
 depends on. It was previously done by running notebook 03 by hand.
 
-    python scripts/build_cohort.py --dry-run     # report, write nothing
-    python scripts/build_cohort.py               # both cycles
-    python scripts/build_cohort.py --cohort G
+    python scripts/build_cohort.py --validity spec --dry-run
+    python scripts/build_cohort.py --validity spec --cohort H
+    python scripts/build_cohort.py --validity legacy --cohort G
+
+`--validity` is required. 'spec' applies methods.md 5.2 and needs
+scripts/build_validity.py to have been run first, with the two thresholds
+chosen deliberately; 'legacy' applies the superseded PAXLDAY == '9' header
+rule and exists to reproduce the cohort files already in data/processed.
 
 Sampling is seeded, so repeated runs reproduce the same cohort. Changing
---seed or --control-ratio changes the study population: do it deliberately,
-and record why in doc/analysis-log.md.
+--seed, --control-ratio or --validity changes the study population: do it
+deliberately, and record why in doc/analysis-log.md.
 """
 
 import argparse
@@ -22,7 +27,7 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from ambient_light_epilepsy import matching, paths, provenance
+from ambient_light_epilepsy import matching, paths, provenance, wear
 
 
 def parse_args():
@@ -44,6 +49,17 @@ def parse_args():
         type=int,
         default=matching.DEFAULT_SEED,
         help=f"Sampling seed (default: {matching.DEFAULT_SEED})",
+    )
+    parser.add_argument(
+        "--validity",
+        choices=["spec", "legacy"],
+        required=True,
+        help="Which accelerometry validity rule decides eligibility. 'spec' is "
+             "methods.md 5.2, read from valid_recordings_{cycle}.csv (build it "
+             "first with scripts/build_validity.py). 'legacy' is the superseded "
+             "PAXSTS == 1 and PAXLDAY == '9' rule, for reproducing the existing "
+             "cohort files. Required: the two rules select different study "
+             "populations, so the choice is stated, never defaulted",
     )
     parser.add_argument(
         "--base-path",
@@ -77,6 +93,7 @@ def write_provenance(save_dir, year, args, n_cases, n_controls):
             "seed": args.seed,
             "min_age": matching.MIN_AGE,
             "match_cols": matching.MATCH_COLS,
+            "validity_rule": args.validity,
         },
         "data_root": str(paths.data_root(args.base_path)),
         "machine": platform.node(),
@@ -91,10 +108,34 @@ def write_provenance(save_dir, year, args, n_cases, n_controls):
     return path
 
 
+def resolve_validity(year, args):
+    """
+    Which participants count as having a valid recording.
+
+    Kept separate so the two rules are visibly alternatives rather than one
+    being a special case of the other. methods.md 5.2 replaced the header rule
+    on 2026-09-02; the header rule survives only to reproduce what is already
+    in results/.
+    """
+    if args.validity == "spec":
+        table = wear.load_validity(year, args.base_path)
+        print(f"Validity rule                 : methods.md 5.2, from "
+              f"valid_recordings_{year}.csv")
+        return wear.valid_seqns(table)
+
+    header = wear.load_header(year, args.base_path)
+    print("Validity rule                 : SUPERSEDED PAXLDAY == '9' header rule")
+    return wear.header_only_validity(header)
+
+
 def build(year, args):
     print(f"\n{'=' * 62}\nCycle {year}\n{'=' * 62}")
 
-    df_all, df_pwe = matching.eligible_participants(year, args.base_path)
+    valid = resolve_validity(year, args)
+
+    df_all, df_pwe = matching.eligible_participants(
+        year, valid_seqns=valid, base_path=args.base_path
+    )
     print(f"Adults with a valid recording : {len(df_all)}")
     print(f"  of whom identified as PWE   : {len(df_pwe)}")
 

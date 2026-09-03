@@ -106,8 +106,26 @@ cycle H, so it is not the primary definition and everything in `results/` derive
 
 ### Recording validity — `PAXHD`
 
-Participants are included only where `PAXSTS == 1` (valid recording) and `PAXLDAY == '9'`
-(full 9 days of data). Note `PAXLDAY` is compared as a **string**.
+| Column | Meaning |
+|---|---|
+| `PAXSTS` | 1 = has at least one minute of data, 2 = none. 7,776 and 1,137 in cycle H |
+| `PAXFTIME` | Clock time of the **first** minute, HH:MM:SS. 09:11 to 21:30 in cycle H |
+| `PAXETLDY` | Clock time at the **end** of the last minute |
+| `PAXLDAY` | Last calendar day with data, 1–9. Stored as a **string** |
+| `PAXFDAY` | Day of the week the recording started |
+
+`PAXFTIME` is required to read `PAXMIN` at all — see below.
+
+Validity is decided by `wear.valid_recordings` per methods.md §5.2, and written to
+`valid_recordings_{cycle}.csv` by `scripts/build_validity.py`.
+`matching.eligible_participants` takes the resulting SEQN list as a required argument.
+
+> **Superseded 2026-09-03.** Participants used to be included where `PAXSTS == 1` **and**
+> `PAXLDAY == '9'`, read straight off the header. §5.2 replaces that rule: it counts days
+> with enough retained wear instead. The old rule is retained as
+> `wear.header_only_validity` so the cohort files already in `data/processed` and
+> everything in `results/` stay reproducible, and `scripts/build_cohort.py --validity
+> legacy` applies it. It is not the study rule.
 
 ### Light — `PAXLUX`
 
@@ -150,12 +168,46 @@ below.
 | `PAXTSM` | Valid seconds contributing to the minute |
 | `PAXSSNMP` | Sample counter at 80 Hz; minute index is `PAXSSNMP / (60 * 80)` |
 | `PAXDAYM`, `PAXDAYWM` | Day number and day of week |
-| `PAXTRANM` | Transition indicator |
-| `PAXQFM`, `PAXFLGSM` | Quality flag and data flags |
+| `PAXTRANM` | Transition indicator: the two 30 s halves of the minute were classified differently |
+| `PAXQFM` | Number of quality flags on the minute. `> 0` means CDC judged it invalid |
+| `PAXFLGSM` | The flag letters themselves, concatenated: `'A'`, `'AB'`, `'ABCSUWXY'` |
 
-Non-wear is defined in notebook 09 as `PAXTSM < 45` or `PAXPREDM == 3`, and both activity
-and light are masked to missing over non-wear minutes. Wear blocks shorter than 1440
-minutes are discarded.
+`PAXPREDM` is released as a **string** (`'1'`–`'4'`), as are `PAXDAYM` and `PAXDAYWM`.
+Codes are 1 wake wear, 2 sleep wear, 3 non-wear, 4 unknown.
+
+`PAXQFM` is exactly the number of letters in `PAXFLGSM`, so `PAXQFM > 0` and
+`PAXFLGSM != ''` are the same rule — verified to agree on all 88,223,479 rows of
+`PAXMIN_H`.
+
+**There is no clock time in this table.** Time of day must be reconstructed as
+`PAXHD.PAXFTIME + PAXSSNMP / (60 * 80)` minutes, because the device was started when the
+participant left the exam centre rather than at midnight. `PAXDAYM` gives the calendar
+day, so day 1 and the last day are partial and the days between them are full 1,440-minute
+days. `wear.add_clock_times` does this; nothing else should.
+
+### Non-wear and valid days — `wear.py`
+
+Implements methods.md §5.1 and §5.2. A minute is dropped if `PAXQFM > 0` or `PAXFLGSM`
+holds a letter, or `PAXPREDM == 3`, or `PAXMTSM < 0`, or `PAXTSM < 45`. Light and activity
+are masked from one shared `retained` array, so the two channels always derive from the
+same minutes. In cycle H this removes **12,302,429 of 88,223,479 minutes (13.9%)**, almost
+all of it `PAXPREDM` non-wear; `PAXTSM < 45` removes nothing that the other rules do not.
+Sleep (code 2) and unknown (code 4, 3.3% of minutes) are **kept**, as §5.1 names only
+non-wear.
+
+Days run noon to noon, and the first and last are dropped as partial by protocol. A
+complete nine-day recording therefore yields exactly 7 candidate days of 1,440 minutes,
+whatever time the device was started. A day is valid with `min_wear_hours` of retained
+minutes, a participant included with `min_valid_days` valid days — **both thresholds are
+provisional and are required arguments, not defaults.** See
+[implementation-status.md](implementation-status.md).
+
+> **Superseded 2026-09-03.** Notebook 09 defined non-wear as `PAXTSM < 45` or
+> `PAXPREDM == 3`, applied no quality-flag exclusion, discarded wear blocks shorter than
+> 1,440 minutes, and had no concept of a day. None of that came from the specification.
+> Its `minute_of_day` column was `PAXSSNMP % 1440`, which treats the first minute as
+> midnight and so mislabels every clock time by `PAXFTIME`; the column was never consumed
+> downstream, so no result is affected.
 
 ### Two sources of light data
 
@@ -165,7 +217,8 @@ The project has light exposure from two places, and they are not equivalent.
 |---|---|---|
 | Resolution | 1 Hz, plus a derived 5-minute downsample | 1 minute |
 | Activity in the same table | No | Yes |
-| Non-wear handling | Not applied; metrics span the whole recording | Masked by `PAXPREDM` / `PAXTSM` |
+| Non-wear handling | Not applied; metrics span the whole recording | Masked per §5.1 by `wear.py` |
+| Clock time | Real timestamps in the file | Reconstructed from `PAXHD.PAXFTIME` |
 | Preprocessing | Three R steps, cohort previously hard-coded | Read directly from the NHANES table |
 | Status | Exploratory | Intended for publication |
 

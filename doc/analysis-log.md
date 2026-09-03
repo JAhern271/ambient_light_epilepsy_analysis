@@ -23,6 +23,103 @@ Template:
 
 ---
 
+## 2026-09-03 — Non-wear masking and valid-day rules implemented; PAXMIN read path verified against the CDC codebook
+
+**Ran:** New `src/ambient_light_epilepsy/wear.py` implementing methods.md §5.1 and §5.2,
+with `tests/test_wear.py` (58 tests) written before it and run against synthetic PAXMIN
+recordings whose answers are derivable by hand. Read-only queries over all 88,223,479 rows
+of `PAXMIN_H` and all 7,776 `PAXHD_H` records with `PAXSTS == 1`. This PC, W: drive data.
+Nothing in `results/` touched; no cohort built or filtered.
+
+**Output:** `src/ambient_light_epilepsy/wear.py`, `scripts/build_validity.py`,
+`tests/test_wear.py`. No data files written.
+
+**Found:**
+
+1. **The read path is verified against the authority.** Every minute-level count computed
+   from the parquet matches the frequency tables printed in the CDC codebook exactly:
+   88,223,479 rows; `PAXPREDM` 47,112,094 / 26,073,307 / 12,091,619 / 2,946,459 for
+   wake / sleep / non-wear / unknown; `PAXMTSM == -0.01` 1,875; `PAXFLGSM` non-blank
+   274,027. This validates the XPT→parquet conversion and the column typing independently
+   of anything in this repository.
+
+2. **`PAXQFM > 0` and `PAXFLGSM != ''` are the same rule** — they disagree on **0 of
+   88,223,479 rows**. `PAXQFM` is simply the number of letters in `PAXFLGSM`. §5.1's
+   "contains any letter value" and CDC's own "values >0 indicate that this minute is
+   invalid" are therefore interchangeable. Both are applied, as a union.
+
+3. **§5.1 masks 12,302,429 minutes, 13.9% of the table**, almost all of it `PAXPREDM`
+   non-wear. That is the quantity of data the PAXLUX route currently includes and should
+   not, so it is the size of the problem this work fixes.
+
+4. **`validity.min_valid_seconds = 45` is redundant, not merely rare.** `PAXTSM < 45`
+   occurs 63 times in 88 million rows, and every one of those minutes is already excluded
+   by rules 1 to 3, so the rule removes **zero** additional minutes from cycle H. It is
+   retained but has no effect. (An earlier claim in conversation that `PAXTSM < 45` never
+   occurs was wrong — the codebook gives the range as 3 to 60, and the minimum is 3.)
+
+5. **Notebook 09's `minute_of_day` is wrong, and was never used.** It computes
+   `PAXSSNMP % 1440`, which treats the first minute of the recording as midnight. PAXMIN
+   carries no clock time; it must come from `PAXHD.PAXFTIME`, which ranges from 09:11 to
+   21:30 in cycle H. Every participant's clock was therefore shifted by a different
+   amount, up to 12.5 h. The column was never consumed downstream, so no result is
+   affected, but it would have gone off the moment anyone applied the §6.1 day or night
+   windows to PAXMIN. Reconstructing `PAXFTIME + PAXSSNMP` was checked against the day-1
+   record count for 369 participants: **369/369 exact**.
+
+6. **Noon-to-noon days: "drop the first and last" and "keep only wholly-covered days" are
+   the same rule on this data** — 0 disagreements across all 7,776 participants, both
+   giving 7 candidate days to 7,522 of them. The alternative of keeping every day and
+   letting the 20 h threshold decide differs for 3,573 participants, 3,554 of whom have
+   `PAXFTIME` ≤ 16:00: it makes the candidate-day count depend on whether the MEC
+   appointment was before or after 4pm. Rejected for that reason, on the researcher's
+   decision. Cost of the chosen rule: 147 participants have fewer than 4 candidate days
+   versus 127 under the alternative, i.e. 20 more of 7,776 (0.26%).
+
+7. **Two independent routes to the day geometry agree exactly.** `wear.py` working from
+   real PAXMIN minute records, against arithmetic on `PAXHD` alone, for 30 participants
+   spanning the whole `PAXFTIME` range and `PAXLDAY` 1–9: candidate-day count 30/30, full
+   per-day coverage vector 30/30, coverage summing to the row count 30/30.
+
+8. **A discrepancy chased and closed.** Reconstructing minute counts from `PAXHD` gave
+   88,224,097 against the table's 88,223,479 — 618 too many, one minute each for 618
+   participants. Cause: `PAXETLDY` is the *end* of the final minute, so a recording ending
+   `12:39:00` has its last record at 12:38 while one ending `16:38:59` has its last at
+   16:38. The fault was in the throwaway verification arithmetic, not in `wear.py`, which
+   never reads `PAXETLDY`.
+
+9. **A test hole found by mutation testing.** Four deliberate faults were injected to check
+   the tests had teeth: an exclusive wear-threshold comparison (caught, 3 failures),
+   dropping `PAXFTIME` (caught, 9), removing the quality-flag rule (caught, 7), and masking
+   activity by non-wear alone rather than by the full retained set — **not caught**. The
+   joint-masking fixture applied only non-wear, so the two masks were identical and the
+   test could not distinguish them. Fixture rewritten to inject two different kinds of
+   excluded minute; the mutation is now caught by 2 tests.
+
+**Decisions taken by the researcher during this work:**
+
+- Noon-to-noon days with the first and last dropped, per §5.2 as written (see 6 above).
+- **`min_valid_days` and `min_wear_hours` are reserved pending a literature review.** The
+  committed 4 and 20 are provisional. Consequence in code: both are required arguments
+  with no defaults throughout `wear.py`, `scripts/build_validity.py` requires them on the
+  command line, and the tests are parameterised on them (H ∈ {16, 20, 22}, D ∈ {3, 4, 5})
+  rather than pinning 4 and 20, so settling them changes no test.
+
+**Open question, not decided:** `PAXPREDM == 4` ("unknown", 2,946,459 minutes, 3.3%) is
+kept, because §5.1 names only non-wear. Pinned by a test so that changing it is visible.
+
+**Next:** `PAXLDAY == '9'` is gone from `matching.eligible_participants`, which now takes
+`valid_seqns` as a required argument; `wear.header_only_validity` retains the superseded
+rule so the existing cohort files reproduce. `scripts/build_cohort.py` requires
+`--validity spec|legacy`. Nothing has been run against a real cohort: that needs D and H
+first, and it will change the study population in **both** directions — from the header
+alone, up to 92 participants with `PAXLDAY < 9` have ≥ 4 candidate days and would be
+admitted, while participants with all nine days but heavy non-wear will now be excluded,
+which the old rule could not detect. Both counts to be measured and reported before
+anything downstream uses the new cohort.
+
+---
+
 ## 2026-09-02 — Case ascertainment rewritten code-first; the spec's primary yield was mislabelled
 
 **Ran:** Rewrote `cohort.find_people_on_asm` as `cohort.find_cases(cycle, definition=)`,

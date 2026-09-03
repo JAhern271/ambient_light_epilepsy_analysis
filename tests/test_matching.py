@@ -41,6 +41,64 @@ def cases_and_pool(demographics):
 
 
 # ---------------------------------------------------------------------------
+# Inclusion criteria
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def fake_sources(monkeypatch, demographics):
+    """
+    Stand in for the NHANES tables, so the inclusion logic can be tested
+    without a data root. Ages are forced so that the age criterion and the
+    validity criterion can be told apart.
+    """
+    demo = demographics.copy()
+    demo.loc[1000, "age"] = 19            # under age, but a valid recording
+    demo.loc[1001, "age"] = 45
+    demo.loc[1002, "age"] = 45
+    demo.loc[1003, "age"] = 45
+
+    monkeypatch.setattr(matching.nhn, "load_partial_demo",
+                        lambda *a, **k: demo)
+    monkeypatch.setattr(matching.nhn, "add_demo_labels", lambda df: df)
+    # 1000-1002 are cases; 1003 onwards are potential controls
+    monkeypatch.setattr(matching.ch, "load_pwe_seqn",
+                        lambda *a, **k: pd.DataFrame([1000, 1001, 1002]))
+
+    return demo
+
+
+def test_only_participants_with_a_valid_recording_are_eligible(fake_sources):
+    """
+    The validity gate is applied to the control pool and the cases alike.
+    1002 has a valid recording but is withheld here; 1000 is age-ineligible.
+    """
+    df_all, df_pwe = matching.eligible_participants(
+        "X", valid_seqns=[1000, 1001, 1003]
+    )
+
+    assert list(df_pwe.index) == [1001]          # 1000 too young, 1002 invalid
+    assert set(df_all.index) == {1001, 1003}     # 1000 too young
+
+
+def test_validity_is_required_and_has_no_default():
+    """
+    methods.md 5.2 decides this, and its two thresholds are unsettled
+    (doc/implementation-status.md), so no caller may fall back to a default.
+    The superseded PAXLDAY == '9' rule used to be applied here silently.
+    """
+    with pytest.raises(TypeError):
+        matching.eligible_participants("X")
+
+
+def test_an_empty_validity_set_yields_an_empty_cohort(fake_sources):
+    """Not an exception: a cycle with no valid recordings has no cohort."""
+    df_all, df_pwe = matching.eligible_participants("X", valid_seqns=[])
+
+    assert df_all.empty
+    assert df_pwe.empty
+
+
+# ---------------------------------------------------------------------------
 # Age banding
 # ---------------------------------------------------------------------------
 

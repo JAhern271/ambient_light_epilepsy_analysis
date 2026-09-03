@@ -102,20 +102,64 @@ Ordered by how much damage they do if left.
       argument (`definition=`, already accepted by `eligible_participants`); the work is
       in deciding what to do with the existing `freq_match_*` files rather than in the
       code. **Nothing downstream uses the primary definition until this is done.**
-- [ ] **`analysis_params.toml` is read for `[cohort]` only.** `params.py` exists and is
-      the mechanism; every other section is still specification-only, and the literals
-      that contradict it are the night-window and threshold items above.
-- [ ] **Non-wear and valid-day handling.** The PAXLUX route applies none at all — metrics
-      span the whole recording, including non-wear. Notebook 09's PAXMIN masking
-      (`PAXTSM < 45` or `PAXPREDM == 3`, wear blocks under 1,440 min discarded) is a
-      different rule again, and neither applies a `PAXQFM` exclusion. Promote out of the
-      notebook into `src/`, add the quality flag, noon-to-noon days, and the spec's
-      ≥ 4 valid days at ≥ 20 h (§5.2). **Test before use** — a wrong wear threshold
-      produces plausible numbers rather than an error.
-- [ ] **Participant-level validity rule.** Code requires `PAXSTS == 1` *and*
-      `PAXLDAY == '9'` (all nine days, including the partial first and last that the spec
-      drops). This is stricter than the spec's rule, so switching recovers cases: 47
-      age-eligible H cases become 39 under the current rule.
+- [ ] **`analysis_params.toml` is read for `[cohort]` and `[validity]` only.** `params.py`
+      is the mechanism; `[cohort]` was wired up 2026-09-02 and `[validity]` on 2026-09-03
+      by `wear.py`. `[light]`, `[sleep]`, `[matching]`, `[survey]` and `[multiplicity]` are
+      still specification-only, and the literals that contradict them are the night-window
+      and threshold items above. Note the two provisional `[validity]` thresholds are
+      deliberately *not* read as defaults — see the valid-day item below.
+- [x] **Non-wear and valid-day handling.** Done 2026-09-03, together with the
+      participant-level validity item below. New `wear.py` implements §5.1 and §5.2:
+      quality flag (`PAXQFM > 0`, equivalently any `PAXFLGSM` letter — verified to agree
+      on all 88,223,479 rows), `PAXPREDM` non-wear, negative `PAXMTSM`, `PAXTSM` floor,
+      light and activity masked jointly from one array, noon-to-noon days with the partial
+      first and last dropped, and the D-days-at-H-hours rule. 58 tests written first,
+      against synthetic recordings with hand-derived answers, and checked by injecting
+      four deliberate faults — one of which the tests initially missed, so the joint-
+      masking fixture was rewritten. Verified against real data two ways: every
+      minute-level count matches the CDC codebook exactly, and the day geometry agrees
+      with independent `PAXHD` arithmetic for 30 participants across the whole `PAXFTIME`
+      range. §5.1 masks 13.9% of minutes in cycle H. See the 2026-09-03 entry in
+      [analysis-log.md](analysis-log.md).
+      - [ ] **The valid-day thresholds are still NOT settled — this is the live item.**
+            `min_valid_days = 4` and `min_wear_hours = 20` follow [Xiao_2023] but the
+            researcher reserved the choice pending a literature review (2026-09-02).
+            Both are marked provisional in `analysis_params.toml` and are **required
+            arguments with no defaults**: `scripts/build_validity.py` will not run
+            without them, and the tests are parameterised on H ∈ {16, 20, 22} and
+            D ∈ {3, 4, 5} rather than pinning 4/20, so settling them changes no test.
+            **Ask the researcher for D and H before building or filtering a cohort.**
+      - [ ] **Nothing has been run against a real cohort yet**, for the reason above. Once
+            D and H are set: run `scripts/build_validity.py`, then report the cohort
+            change in **both** directions before anything downstream uses it. From the
+            header alone, up to 92 participants with `PAXLDAY < 9` have ≥ 4 candidate days
+            and would be newly admitted; an unknown number with all nine days but heavy
+            non-wear will now be excluded, which the old rule could not detect.
+      - [ ] **`PAXPREDM == 4` ("unknown") is kept, undecided.** 2,946,459 minutes, 3.3% of
+            the table. §5.1 names only non-wear, so the spec as written keeps them. Mask
+            them, keep them, or make it a sensitivity analysis? Pinned by a test so a
+            change is visible.
+      - [ ] **`validity.min_valid_seconds` is an orphan.** It is in
+            `analysis_params.toml` and came from notebook 09, but §5.1 does not name it,
+            and it excludes nothing in cycle H that the other rules do not already exclude
+            (63 minutes in 88 million, all redundant). Either add it to §5.1 as a fourth
+            rule or delete the parameter. Free either way — it changes no result.
+      - [ ] **Johnson 2023 and Su 2022 valid-day rules** as sensitivity analyses (§5.2,
+            §8.4 item 2). Su is free — it is D=3, H=16 through the same arguments.
+            Johnson needs code the others do not: its days must be *consecutive*, it has
+            a total-daily-activity floor of 200, and it excludes a participant with **any**
+            invalid day. Its wear threshold is the same 20 h (their ">4 h missing").
+- [x] **Participant-level validity rule.** Done 2026-09-03, folded into the item above
+      because §5.2 replaces this rule rather than amending it. `PAXLDAY == '9'` is gone
+      from `matching.eligible_participants`, which now takes `valid_seqns` as a
+      **required** argument — the decision needs the 88-million-row PAXMIN table and
+      depends on two unsettled thresholds, so no caller may reach it by default.
+      `scripts/build_cohort.py` requires `--validity spec|legacy`. The superseded rule
+      survives as `wear.header_only_validity` so the committed cohort files and everything
+      in `results/` stay reproducible. The cohort change is **not** the one-directional
+      recovery this item assumed: it also excludes participants with nine days of
+      recording but too little wear, which the header rule could not see. Both directions
+      to be measured once D and H are set — see above.
 - [ ] **Light thresholds at 100 and 250 lux.** `time_above_threshold_normalized` already
       takes a `threshold` argument; only the call site is hard-coded to 1,000.
 - [ ] **Proportion of daytime minutes at the 2,500 lux ceiling** (spec §6.2, secondary).
