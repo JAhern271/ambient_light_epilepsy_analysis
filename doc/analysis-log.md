@@ -23,6 +23,70 @@ Template:
 
 ---
 
+## 2026-09-03 — Is the valid-day rule a differential selection mechanism on cases? No consistent evidence
+
+**Ran:** Descriptive comparison of wear and valid-day counts between cases and the
+age-eligible control pool, from `valid_recordings_{H,G}.csv` plus a per-participant row
+count over both PAXMIN tables. Cycle H under the `primary` and `broad` definitions and
+cycle G under `broad`. Unweighted, unmatched, no formal inference — methods.md §9 puts
+statistics in the R layer. This PC, W: drive data. Nothing written.
+
+**Why it was asked.** §5.2 costs 7 of the 44 primary cases (see the entry below), and 37
+is not simply a smaller 44 if the lost cases differ systematically. There is a plausible
+mechanism: ASM sedation, disability, or anything reducing tolerance for a wrist device
+would raise non-wear in cases, so the rule would be selecting on something plausibly
+*caused by* the exposure. That also bears on §10.3, whose "non-differential measurement
+error biases toward the null" reasoning assumes exactly what this checks.
+
+**The comparison involves no outcome data** — only wear — so it carries no
+pre-specification cost.
+
+**Found: no consistent evidence of differential selection, and the direction flips.**
+
+| | H primary | H broad | G broad |
+|---|---|---|---|
+| cases with accelerometry | 46 | 117 | 89 |
+| controls | 4,794 | 4,723 | 4,575 |
+| cases excluded by §5.2 | 19.6% [10.7, 33.2] | 17.1% [11.3, 24.9] | 9.0% [4.6, 16.7] |
+| controls excluded | 15.6% [14.6, 16.6] | 15.6% [14.6, 16.6] | 13.6% [12.7, 14.7] |
+| excess in cases | +4.0 pp (RR 1.26) | +1.5 pp (RR 1.10) | **−4.7 pp (RR 0.66)** |
+
+Intervals are Wilson 95%, for reading the size of a difference rather than testing it. In
+all three the case interval comfortably contains the control estimate, and cycle G runs
+the opposite way — the signature of noise, not a mechanism.
+
+Three further readings agree:
+
+- **Median valid days is higher in cases**, not lower: 7.00 (IQR 5.25–7.00) against 6.00
+  (5.00–7.00) in H primary.
+- **Median retained fraction 0.96 in cases against 0.95 in controls.** If anything cases
+  wore the device slightly better.
+- **Geometry control passes.** Candidate days are 7.00 with IQR 7–7 in both groups, so
+  recording length is identical between them and any difference in valid days is about
+  wear rather than about how long the device ran. This is what separates the two.
+
+**One pattern worth keeping, on numbers too small to lean on.** Cases under the primary
+definition are more *polarised* than controls: 13.0% at zero valid days against 6.6%, but
+52.2% at seven against 42.9%. That is the shape a small subgroup with more severe disease
+or heavier sedation would produce. It rests on **6 cases** against roughly 3 expected, so
+it is not evidence of anything; recorded so it can be looked at again if the sample ever
+grows, and so it is not rediscovered as a surprise.
+
+**The prior selection gate was checked too.** Device non-return removes 8 of 54
+age-eligible primary cases (14.8%) and 19 of 136 broad cases (14.0%), against 904 of 5,627
+controls (16.1%). Cases are marginally *more* likely to have accelerometry, so there is no
+differential loss at that step either.
+
+**A count stated precisely, because an earlier summary was loose:** 9 of the 46 primary
+cases with accelerometry fail §5.2, of which 7 had been admitted by the superseded nine-day
+rule. Both are consistent with 44 → 37; the other 2 failed the old rule as well.
+
+**Next:** offered to the researcher as a candidate line in §10 — the check is worth stating
+in the manuscript whichever way it had come out, and §10.3's non-differential assumption is
+the natural place for it. Not added unilaterally.
+
+---
+
 ## 2026-09-03 — Valid-day rule settled at D=4/H=20; it CUTS the cohort by 16%, the opposite of what was predicted
 
 **Ran:** `scripts/build_validity.py --cohort H|G --min-valid-days 4 --min-wear-hours 20`,
