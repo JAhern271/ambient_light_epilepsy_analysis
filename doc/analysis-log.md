@@ -23,6 +23,58 @@ Template:
 
 ---
 
+## 2026-09-03 — `min_valid_seconds` deleted; `PAXPREDM == 4` retained; both decisions written into §5.1
+
+**Ran:** Removed `validity.min_valid_seconds` from `analysis_params.toml` and the
+corresponding rule from `wear.mask_minutes`; `PAXTSM` is no longer read at all and is out
+of `MINUTE_COLUMNS`. Verified the deletion is behaviour-neutral by scanning **both** full
+PAXMIN tables. This PC, W: drive data. 152 tests pass. Nothing in `results/` touched; no
+cohort built.
+
+**Output:** no data files. Changes to `analysis_params.toml`, `wear.py`, `test_wear.py`,
+`methods.md` §5.1, `data-sources.md`, `implementation-status.md`.
+
+**Found: the deletion changes nothing, in either cycle.**
+
+| | Cycle H | Cycle G |
+|---|---|---|
+| Rows | 88,223,479 | 78,126,856 |
+| `PAXTSM` minimum | 3 | 2 |
+| `PAXTSM < 45` occurrences | 63 | 2,902 |
+| Minutes it would **add** to the §5.1 exclusion set | **0** | **0** |
+| `PAXQFM > 0` vs `PAXFLGSM != ''` disagreements | **0** | **0** |
+| §5.1 masks | 12,302,429 (13.9%) | 8,962,404 (11.5%) |
+
+The rule fires 46 times more often in cycle G than in cycle H and *still* excludes nothing
+the three specified rules do not already exclude, so removing it cannot alter a result in
+either the primary or the replication cohort. The `PAXQFM` / `PAXFLGSM` equivalence
+established for cycle H also holds exactly in cycle G.
+
+**Decisions taken by the researcher:**
+
+1. **`validity.min_valid_seconds` deleted** rather than written into §5.1 as a fourth
+   rule. It came from notebook 09 and was never specified. §5.1 now states positively that
+   `PAXTSM` is not an exclusion, so the question does not reopen. A test asserts a
+   3-second minute is retained and that the parameter is absent from `[validity]`, so
+   re-adding the rule fails the suite.
+2. **`PAXPREDM == 4` ("unknown") retained** — 2,946,459 minutes in H, 3.3%; 2,716,383 in
+   G. These are minutes of valid data carrying an uncertain *label*, not minutes of absent
+   data, and rule 1 already removes those the QC review rejected. Pinned by a test.
+3. **Johnson 2023's valid-day rule deferred, not dropped.** It is still pre-specified in
+   §5.2 and §8.4 item 2. Recorded as deferred in `implementation-status.md` with a note
+   that dropping it outright would be a deliberate spec amendment, since removing a
+   pre-specified sensitivity analysis quietly is what the pre-specification exists to
+   prevent. Su 2022 needs no code — it is D=3, H=16 through the same arguments.
+
+**Also:** §5.1 amended to *state* rather than change what it already specified — the
+quality flag variable is named, and both decisions above are written down with their
+reasoning. No rule changed. Recorded in the methods.md revision history.
+
+**Next:** the valid-day thresholds D and H. The researcher has them; nothing has been run
+against a real cohort until they are set.
+
+---
+
 ## 2026-09-03 — Non-wear masking and valid-day rules implemented; PAXMIN read path verified against the CDC codebook
 
 **Ran:** New `src/ambient_light_epilepsy/wear.py` implementing methods.md §5.1 and §5.2,

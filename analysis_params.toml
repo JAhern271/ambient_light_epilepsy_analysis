@@ -82,9 +82,7 @@ day_boundary_hour = 12        # noon-to-noon days, so a night falls in one day
 drop_partial_first_last = true    # first and last noon-to-noon day are partial
 nonwear_pred_code = 3         # PAXPREDM: predicted non-wear. 2 (sleep) and 4
                               # (unknown, 3.3% of minutes) are KEPT, per 5.1
-min_valid_seconds = 45        # PAXTSM below this -> minute dropped. Verified
-                              # redundant in cycle H: 63 such minutes in 88
-                              # million, all already excluded by another rule
+                              # -- settled 2026-09-03, not an open question
 exclude_quality_flagged = true    # PAXQFM > 0, equivalently PAXFLGSM holding
                               # any letter. The two agree on all 88,223,479
                               # rows of PAXMIN_H; both are applied

@@ -165,7 +165,7 @@ below.
 | `PAXAISMM` | MIMS accelerometer value |
 | `PAXMXM`, `PAXMYM`, `PAXMZM` | Per-axis MIMS values |
 | `PAXPREDM` | Predicted wear status; `3` denotes non-wear |
-| `PAXTSM` | Valid seconds contributing to the minute |
+| `PAXTSM` | Seconds of data in the minute, range 3–60. **Not used** — see below |
 | `PAXSSNMP` | Sample counter at 80 Hz; minute index is `PAXSSNMP / (60 * 80)` |
 | `PAXDAYM`, `PAXDAYWM` | Day number and day of week |
 | `PAXTRANM` | Transition indicator: the two 30 s halves of the minute were classified differently |
@@ -188,12 +188,16 @@ days. `wear.add_clock_times` does this; nothing else should.
 ### Non-wear and valid days — `wear.py`
 
 Implements methods.md §5.1 and §5.2. A minute is dropped if `PAXQFM > 0` or `PAXFLGSM`
-holds a letter, or `PAXPREDM == 3`, or `PAXMTSM < 0`, or `PAXTSM < 45`. Light and activity
-are masked from one shared `retained` array, so the two channels always derive from the
-same minutes. In cycle H this removes **12,302,429 of 88,223,479 minutes (13.9%)**, almost
-all of it `PAXPREDM` non-wear; `PAXTSM < 45` removes nothing that the other rules do not.
-Sleep (code 2) and unknown (code 4, 3.3% of minutes) are **kept**, as §5.1 names only
-non-wear.
+holds a letter, or `PAXPREDM == 3`, or `PAXMTSM < 0`. Those three are the whole rule.
+Light and activity are masked from one shared `retained` array, so the two channels always
+derive from the same minutes. In cycle H this removes **12,302,429 of 88,223,479 minutes
+(13.9%)**, almost all of it `PAXPREDM` non-wear.
+
+`PAXPREDM` sleep (code 2) and unknown (code 4, 3.3% of minutes) are **kept** — a settled
+decision, not an omission. `PAXTSM` is **not** read at all: the `min_valid_seconds = 45`
+rule came from notebook 09, was never in §5.1, and excluded nothing the three real rules
+do not already exclude, so the parameter was deleted on 2026-09-03. Both are pinned by
+tests, so reversing either is a visible change.
 
 Days run noon to noon, and the first and last are dropped as partial by protocol. A
 complete nine-day recording therefore yields exactly 7 candidate days of 1,440 minutes,

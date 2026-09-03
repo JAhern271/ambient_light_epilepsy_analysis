@@ -15,6 +15,7 @@
 
 | Date | Change |
 |---|---|
+| 2026-09-03 | §5.1 made explicit rather than changed, on implementing it: the quality flag variable is named (`PAXFLGSM` / `PAXQFM`), `PAXPREDM` codes 2 and 4 are stated as retained with the reasoning, and `PAXTSM` is stated as not an exclusion. No rule changed; all three were already what §5.1 specified, and both clarifications concern a large enough share of minutes to be worth fixing in writing. §5.2 unchanged, but note its two thresholds are **not settled** — see [implementation-status.md](implementation-status.md). |
 | 2026-09-02 | §4.1 measured-yield table corrected: the row labelled "any drug + G40, ASM confirmed" (72 / 56 / 46) was in fact the count *before* non-ASMs were blanked. With the confirmation step the specification requires, the primary definition yields **70 / 54 / 44**. Both rows are now shown. No definition changed; the label was wrong. `narrow_nocode` named as a fourth definition for the cycle G approximation §4.5 already described in prose (§4.1, §4.5). |
 | 2026-08-27 | Scope narrowed to cycle H for the primary analysis, after `RXQ_RX_G` was found to carry no reason-for-use variables (§4.1). Cycle G becomes a labelled broad-definition replication cohort (§4.5). Case ascertainment restructured as code-first. Yield and power restated on measured counts (§4.1, §7). Sleep derivation contradiction between §6.6 and §9 resolved in favour of GGIR. Software split between Python and R (§9). Parameter values moved to `analysis_params.toml`. |
 | 2026-08-20 | First complete draft. |
@@ -165,9 +166,14 @@ The second reading is the more valuable, because it is a genuine falsification t
 
 A minute is set to missing for both light and activity if any of the following apply, following [Johnson_2023]:
 
-1. The NHANES data quality flag variable contains any letter value
-2. The NHANES-provided prediction variable (PAXPREDM) classifies the minute as non-wear
-3. Activity value is negative or flagged as uncomputable
+1. The NHANES data quality flag variable contains any letter value — `PAXFLGSM`, equivalently `PAXQFM > 0`, which CDC states marks the minute invalid. The two forms were checked against each other on all 88,223,479 rows of `PAXMIN_H` and disagreed on none
+2. The NHANES-provided prediction variable (`PAXPREDM`) classifies the minute as non-wear — code 3 **only**
+3. Activity value is negative or flagged as uncomputable — `PAXMTSM < 0`, CDC's `-0.01` sentinel
+
+**These three are the whole rule.** Two clarifications, added 2026-09-03 because both concern a materially large share of minutes and neither should be re-litigated later:
+
+- **`PAXPREDM` codes 2 (sleep wear) and 4 (unknown) are retained.** Masking sleep would delete every night, and with it H2 and the nighttime light metrics entirely. Code 4 — the minutes CDC's algorithm could not classify — is 2,946,459 minutes, 3.3% of `PAXMIN_H`; it is kept because these are minutes of valid data with an uncertain *label*, not minutes of absent data, and rule 1 already removes those the quality review rejected. This is a decision, not an omission.
+- **Total seconds of data in the minute (`PAXTSM`) is not an exclusion.** An earlier implementation dropped minutes below 45 seconds. That rule was never specified here, and it excludes nothing in `PAXMIN_H` that rules 1–3 do not already exclude: 63 minutes in 88 million, every one of them dropped by another rule. It was removed rather than adopted.
 
 Light and activity are masked jointly rather than separately, so that the two channels are always derived from the same set of retained minutes. This prevents a participant contributing light data from minutes excluded from their activity metrics.
 

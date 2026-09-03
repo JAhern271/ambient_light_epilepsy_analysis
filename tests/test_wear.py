@@ -150,9 +150,8 @@ INJECT = 300
         {"PAXPREDM": "3"},                      # non-wear
         {"PAXQFM": 1.0, "PAXFLGSM": "P"},       # quality flagged
         {"PAXMTSM": -0.01},                     # activity uncomputable
-        {"PAXTSM": 30.0},                       # too few valid seconds
     ],
-    ids=["non_wear", "quality_flag", "uncomputable", "short_minute"],
+    ids=["non_wear", "quality_flag", "uncomputable"],
 )
 def test_each_exclusion_removes_its_minutes(columns):
     """Each rule on its own must take a 1,440-minute day down to 1,140."""
@@ -173,14 +172,14 @@ def test_a_clean_day_retains_every_minute():
 
 def test_overlapping_exclusions_are_a_union_not_a_sum():
     """
-    All four rules on the SAME 300 minutes must still remove 300 minutes.
+    All three rules on the SAME 300 minutes must still remove 300 minutes.
     Counting them additively would silently shrink every day, and the result
     would look entirely plausible.
     """
     minutes = set_minutes(
         make_paxmin(first_time=LATE_FIRST_TIME),
         candidate_start(TARGET), INJECT,
-        PAXPREDM="3", PAXQFM=1.0, PAXFLGSM="P", PAXMTSM=-0.01, PAXTSM=30.0,
+        PAXPREDM="3", PAXQFM=1.0, PAXFLGSM="P", PAXMTSM=-0.01,
     )
     days = days_for(minutes).sort_index()
 
@@ -247,13 +246,12 @@ def test_sleep_minutes_are_kept():
     assert days["minutes_retained"].iloc[TARGET] == 1440
 
 
-def test_unknown_wear_status_is_kept_as_the_spec_is_written():
+def test_unknown_wear_status_is_kept():
     """
     PAXPREDM 4 is 'unknown' -- 2,946,459 minutes, 3.3% of PAXMIN_H. methods.md
-    5.1 masks only code 3, so these minutes count as wear. Pinned so that the
-    behaviour is a recorded decision rather than an accident, and so that
-    changing it is a visible test change. Open question in
-    doc/implementation-status.md.
+    5.1 masks only code 3, and the researcher settled on keeping code 4 on
+    2026-09-03. Pinned so the decision is explicit and reversing it is a
+    visible test change rather than a quiet one.
     """
     minutes = set_minutes(
         make_paxmin(first_time=LATE_FIRST_TIME),
@@ -262,6 +260,43 @@ def test_unknown_wear_status_is_kept_as_the_spec_is_written():
     days = days_for(minutes).sort_index()
 
     assert days["minutes_retained"].iloc[TARGET] == 1440
+
+
+def test_a_minute_with_few_valid_seconds_is_kept():
+    """
+    PAXTSM is NOT an exclusion. Notebook 09 dropped minutes below 45 seconds,
+    but that rule was never in methods.md 5.1, and in cycle H it excluded
+    nothing the three real rules do not already exclude -- 63 minutes in 88
+    million, every one already dropped. The parameter was deleted on
+    2026-09-03 rather than written into the spec.
+
+    PAXTSM is at the codebook minimum of 3 seconds here and the minute still
+    survives, so re-adding the rule breaks this test.
+    """
+    minutes = set_minutes(
+        make_paxmin(first_time=LATE_FIRST_TIME),
+        candidate_start(TARGET), INJECT, PAXTSM=3.0,
+    )
+    days = days_for(minutes).sort_index()
+
+    assert days["minutes_retained"].iloc[TARGET] == 1440
+
+
+def test_the_deleted_wear_seconds_parameter_is_gone():
+    """
+    `validity.min_valid_seconds` was removed from analysis_params.toml. The
+    override check in wear._validity rejects unknown keys, so this also
+    confirms nothing else still expects it.
+    """
+    from ambient_light_epilepsy import params
+
+    assert "min_valid_seconds" not in params.section("validity")
+
+    with pytest.raises(KeyError, match="min_valid_seconds"):
+        wear.mask_minutes(
+            make_paxmin(first_time=LATE_FIRST_TIME),
+            validity={"min_valid_seconds": 45},
+        )
 
 
 # ---------------------------------------------------------------------------

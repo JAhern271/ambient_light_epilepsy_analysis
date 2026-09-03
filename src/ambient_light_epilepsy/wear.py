@@ -63,12 +63,11 @@ MINUTE_SAMPLES = 60 * 80
 ANCHOR_DATE = pd.Timestamp("2013-06-03")
 
 # The PAXMIN columns this module needs. Reading a subset matters: the full
-# table is 88,223,479 rows.
+# table is 88,223,479 rows. PAXTSM is deliberately absent -- see mask_minutes.
 MINUTE_COLUMNS = [
     "SEQN",
     "PAXDAYM",
     "PAXSSNMP",
-    "PAXTSM",
     "PAXPREDM",
     "PAXMTSM",
     "PAXLXMM",
@@ -200,11 +199,14 @@ def mask_minutes(minutes, validity=None):
          value could not be computed. CDC notes that the quality review and the
          MIMS computation were run independently, so this does not imply a
          quality flag and rules 1 and 3 are both needed.
-      4. PAXTSM is below `min_valid_seconds`, i.e. the minute holds too few
-         seconds of data. Not named in 5.1 -- it came from notebook 09 -- and
-         it excludes nothing in cycle H that rules 1 to 3 do not already
-         exclude (63 such minutes in 88 million, all of them already dropped).
-         Retained pending a decision on whether 5.1 should name it.
+
+    These are the whole of 5.1. Notebook 09 also dropped minutes with
+    `PAXTSM < 45`, too few seconds of data; that rule was never in the
+    specification, and it excluded nothing in cycle H that rules 1 to 3 do not
+    already exclude -- 63 such minutes in 88 million, every one of them dropped
+    by another rule. It was deleted on 2026-09-03 rather than written into 5.1,
+    so PAXTSM is not read at all. A low-PAXTSM minute is retained on its own
+    merits, which `tests/test_wear.py` pins.
 
     Adds three columns:
 
@@ -231,6 +233,11 @@ def mask_minutes(minutes, validity=None):
     #    has done astype(float) passes a number, so compare numerically and
     #    accept both. A string comparison against the integer parameter would
     #    match nothing and mask no minutes at all.
+    #
+    #    Only code 3. Code 2 is sleep wear -- masking it would delete every
+    #    night, and the nighttime light hypothesis with it -- and code 4 is
+    #    "unknown", 3.3% of the table, which 5.1 does not name. Both are kept;
+    #    settled 2026-09-03.
     predicted = pd.to_numeric(minutes["PAXPREDM"], errors="coerce")
     non_wear = predicted == settings["nonwear_pred_code"]
 
@@ -239,11 +246,7 @@ def mask_minutes(minutes, validity=None):
     activity = pd.to_numeric(minutes["PAXMTSM"], errors="coerce")
     uncomputable = (activity < 0) | (activity == settings["uncomputable_mims"])
 
-    # 4. Too few valid seconds in the minute.
-    seconds = pd.to_numeric(minutes["PAXTSM"], errors="coerce")
-    too_short = seconds < settings["min_valid_seconds"]
-
-    minutes["retained"] = ~(flagged | non_wear | uncomputable | too_short)
+    minutes["retained"] = ~(flagged | non_wear | uncomputable)
 
     minutes["mean_lux"] = pd.to_numeric(
         minutes["PAXLXMM"], errors="coerce"

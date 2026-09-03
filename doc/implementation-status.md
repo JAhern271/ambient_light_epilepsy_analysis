@@ -135,20 +135,29 @@ Ordered by how much damage they do if left.
             header alone, up to 92 participants with `PAXLDAY < 9` have ≥ 4 candidate days
             and would be newly admitted; an unknown number with all nine days but heavy
             non-wear will now be excluded, which the old rule could not detect.
-      - [ ] **`PAXPREDM == 4` ("unknown") is kept, undecided.** 2,946,459 minutes, 3.3% of
-            the table. §5.1 names only non-wear, so the spec as written keeps them. Mask
-            them, keep them, or make it a sensitivity analysis? Pinned by a test so a
-            change is visible.
-      - [ ] **`validity.min_valid_seconds` is an orphan.** It is in
-            `analysis_params.toml` and came from notebook 09, but §5.1 does not name it,
-            and it excludes nothing in cycle H that the other rules do not already exclude
-            (63 minutes in 88 million, all redundant). Either add it to §5.1 as a fourth
-            rule or delete the parameter. Free either way — it changes no result.
-      - [ ] **Johnson 2023 and Su 2022 valid-day rules** as sensitivity analyses (§5.2,
-            §8.4 item 2). Su is free — it is D=3, H=16 through the same arguments.
-            Johnson needs code the others do not: its days must be *consecutive*, it has
-            a total-daily-activity floor of 200, and it excludes a participant with **any**
-            invalid day. Its wear threshold is the same 20 h (their ">4 h missing").
+      - [x] **`PAXPREDM == 4` ("unknown") is kept.** Decided 2026-09-03. 2,946,459
+            minutes, 3.3% of the table. These are minutes of valid data with an uncertain
+            *label*, not absent data, and the quality-flag rule already removes those the
+            QC review rejected. §5.1 was amended to state the decision and its reasoning
+            explicitly rather than leave it implied; pinned by a test.
+      - [x] **`validity.min_valid_seconds` deleted.** Done 2026-09-03. The parameter is
+            gone from `analysis_params.toml`, `PAXTSM` is no longer read at all, and §5.1
+            now states that it is not an exclusion. Provably behaviour-neutral: the rule
+            removed zero minutes not already excluded, in **both** cycles. A test asserts
+            a 3-second minute is retained and that the parameter is absent, so re-adding
+            the rule fails the suite.
+      - [ ] **Su 2022 valid-day rule** as a sensitivity analysis (§5.2, §8.4 item 2).
+            Free — it is D=3, H=16 through the same required arguments, so it needs a
+            run rather than any code.
+      - [ ] **Johnson 2023 valid-day rule — deferred 2026-09-03, not dropped.** It needs
+            structure the others do not: consecutive days, a total-daily-activity floor of
+            200, and exclusion of a participant with **any** invalid day. Its wear
+            threshold is the same 20 h (their ">4 h missing"). Deferred on the
+            researcher's instruction. **Note it is currently pre-specified** in §5.2 and
+            §8.4 item 2, so if the intention is to drop it rather than postpone it, that
+            is a deliberate spec amendment and belongs in the list at the foot of this
+            file — removing a pre-specified sensitivity analysis silently is exactly what
+            the pre-specification exists to prevent.
 - [x] **Participant-level validity rule.** Done 2026-09-03, folded into the item above
       because §5.2 replaces this rule rather than amending it. `PAXLDAY == '9'` is gone
       from `matching.eligible_participants`, which now takes `valid_seqns` as a
