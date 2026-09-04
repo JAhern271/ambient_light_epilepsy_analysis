@@ -117,7 +117,8 @@ cycle H, so it is not the primary definition and everything in `results/` derive
 `PAXFTIME` is required to read `PAXMIN` at all — see below.
 
 Validity is decided by `wear.valid_recordings` per methods.md §5.2, and written to
-`valid_recordings_{cycle}.csv` by `scripts/build_validity.py`.
+`valid_recordings_{cycle}_{rule}.csv` by `scripts/build_validity.py` — one file per
+valid-day rule, named after its thresholds.
 `matching.eligible_participants` takes the resulting SEQN list as a required argument.
 
 > **Superseded 2026-09-03.** Participants used to be included where `PAXSTS == 1` **and**
@@ -299,17 +300,26 @@ Written to `data/processed/`.
 
 | File | Contents |
 |---|---|
-| `valid_recordings_{cycle}.csv` | One row per participant: the methods.md 5.2 verdict, with a `.provenance.json` sidecar recording the two thresholds used |
+| `valid_recordings_{cycle}_{rule}.csv` | One row per participant: the methods.md 5.2 verdict under one valid-day rule, with a `.provenance.json` sidecar. `{rule}` is `d04h20` for the primary rule, `d03h16` for Su 2022 |
 | `cases_{cycle}_{definition}.csv` | SEQN of cases under one case definition, with a `.provenance.json` sidecar recording the drug lists used |
 | `people_with_epilepsy_{cycle}.csv` | SEQN of all identified PWE. Legacy: the drug-first `broad` definition. Kept so existing results reproduce |
 | `freq_match_pwe_{cycle}.csv` | SEQN of PWE entering the matched analysis |
 | `freq_match_control_{cycle}.csv` | SEQN of their frequency-matched controls |
 
-### `valid_recordings_{cycle}.csv`
+### `valid_recordings_{cycle}_{rule}.csv`
 
 Produced by `scripts/build_validity.py`, read by `wear.load_validity`, and turned into an
-eligible-SEQN list by `wear.valid_seqns`. Built at **D = 4 valid days, H = 20 hours**
-(settled 2026-09-03). Columns:
+eligible-SEQN list by `wear.valid_seqns`.
+
+**The filename names the rule.** `{rule}` comes from `wear.rule_label(D, H)`, so
+`valid_recordings_H_d04h20.csv` is 4 valid days at 20 h — the primary rule, settled
+2026-09-03 — and `valid_recordings_H_d03h16.csv` is Su 2022's 3 days at 16 h. The label
+is derived from the thresholds rather than typed, so a filename cannot disagree with the
+rule that produced it, and a sensitivity rule can never overwrite the primary table.
+Callers state which rule they want: `wear.load_validity(cycle, label)` and
+`scripts/build_cohort.py --validity spec --min-valid-days 4 --min-wear-hours 20`.
+
+Columns:
 
 | Column | Meaning |
 |---|---|

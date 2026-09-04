@@ -39,11 +39,14 @@ meaning; the date itself is synthetic and must never be reported.
 Thresholds
 ----------
 `min_valid_days` and `min_wear_hours` are **required arguments with no
-defaults** throughout this module. The values in analysis_params.toml are
-provisional -- the researcher reserved the choice on 2026-09-02, see
-doc/implementation-status.md -- and a default would let a call site adopt an
-unsettled parameter silently. Everything else comes from the [validity] section
-of analysis_params.toml.
+defaults** throughout this module. They were settled on 2026-09-03 at 4 days
+and 20 hours (Xiao 2023) and are recorded in analysis_params.toml, but are
+deliberately not read from there: every run then states the rule it applied,
+the pre-specified sensitivity rules read identically to the primary one, and a
+provenance sidecar can never be ambiguous about which rule produced a file.
+Alternative rules are written alongside the primary table under a `label`, so
+one cannot overwrite the other. Everything else comes from the [validity]
+section of analysis_params.toml.
 """
 
 import numpy as np
@@ -454,7 +457,48 @@ def header_only_validity(header):
 # Reading the real table
 # ---------------------------------------------------------------------------
 
-VALIDITY_FILENAME = "valid_recordings_{cycle}.csv"
+VALIDITY_FILENAME = "valid_recordings_{cycle}_{label}.csv"
+
+
+def rule_label(min_valid_days, min_wear_hours):
+    """
+    A filename-safe label naming the valid-day rule: 4 days at 20 h -> 'd04h20'.
+
+    Derived from the thresholds rather than typed, so a filename cannot
+    disagree with the rule that produced it. That matters because several
+    valid-day rules are pre-specified (methods.md 5.2) and each defines a
+    different study population; a hand-written label would eventually be wrong,
+    and the error would be invisible.
+
+        rule_label(4, 20)     'd04h20'    the primary rule
+        rule_label(3, 16)     'd03h16'    Su 2022
+        rule_label(5, 20)     'd05h20'    Johnson 2023's thresholds
+
+    Fractional hours are written with 'p' for the point, 16.5 -> 'h16p5', so
+    the label stays usable as a filename. No published rule uses them.
+    """
+    days = int(min_valid_days)
+
+    if float(min_wear_hours).is_integer():
+        hours = f"{int(min_wear_hours)}"
+    else:
+        hours = f"{min_wear_hours:g}".replace(".", "p")
+
+    return f"d{days:02d}h{hours}"
+
+
+def validity_filename(cycle, label):
+    """
+    Name of the file holding one cycle's validity verdicts.
+
+    Every table names its rule, so there is no unlabelled file whose rule can
+    only be recovered from a sidecar, and a sensitivity rule can never
+    overwrite the primary one.
+
+        validity_filename("H", rule_label(4, 20))   valid_recordings_H_d04h20.csv
+        validity_filename("H", rule_label(3, 16))   valid_recordings_H_d03h16.csv
+    """
+    return VALIDITY_FILENAME.format(cycle=cycle, label=label)
 
 
 def load_header(cycle, base_path=None):
@@ -462,42 +506,60 @@ def load_header(cycle, base_path=None):
     return nhn.load_PAXHD(cycle, base_path)
 
 
-def save_validity(table, cycle, base_path=None):
+def save_validity(table, cycle, label, base_path=None, overwrite=False):
     """
     Write a participant-level validity table to the processed directory.
 
     Deciding validity means reading the whole PAXMIN table, so the result is
     written once and read back by everything downstream rather than recomputed
-    per caller. `scripts/build_validity.py` is what produces it, and records
+    per caller. `label` comes from `rule_label` and names the rule, so each
+    pre-specified rule gets its own file.
+    `scripts/build_validity.py` is what produces it, and records
     the thresholds used in a provenance sidecar alongside.
+
+    Refuses to replace an existing file unless `overwrite` is set, following
+    `cohort._save_cases`. A validity table defines the study population, so
+    silently rewriting one would change which participants every downstream
+    result was computed from, with nothing to show that it had happened.
+
+    Raises rather than warning, because the caller is usually a script that
+    would otherwise carry on and report counts for a file it did not write.
     """
     directory = paths.processed_dir(cycle, base_path, create=True)
-    path = directory / VALIDITY_FILENAME.format(cycle=cycle)
+    path = directory / validity_filename(cycle, label)
+
+    if path.exists() and not overwrite:
+        raise FileExistsError(
+            f"{path} already exists. A validity table defines the study "
+            "population, so it is not replaced silently. Pass overwrite=True "
+            "(or --overwrite) to replace it deliberately. A different rule "
+            "writes to a different filename, so it needs no overwrite."
+        )
 
     table.to_csv(path)
 
     return path
 
 
-def load_validity(cycle, base_path=None):
+def load_validity(cycle, label, base_path=None):
     """
-    Read the validity table back, indexed by SEQN.
+    Read one rule's validity table back, indexed by SEQN.
 
-    Raises with instructions rather than falling back to a rule of its own:
-    the thresholds are the researcher's choice, and this file is the record of
-    which ones were used.
+    it raises with instructions rather than falling back to a rule of its own.
+    valid-day rule it wants, the same discipline the thresholds follow, and
+    which ones were used. `label` is required: the caller states which
     """
-    name = VALIDITY_FILENAME.format(cycle=cycle)
+    name = validity_filename(cycle, label)
 
     try:
         path = paths.processed_file(name, cycle, base_path)
     except FileNotFoundError as missing:
         raise FileNotFoundError(
-            f"No validity table for cycle {cycle}. Build it with\n"
+            f"No validity table {name}. Build it with\n"
             f"    python scripts/build_validity.py --cohort {cycle} "
             "--min-valid-days D --min-wear-hours H\n"
-            "choosing D and H deliberately -- the values in "
-            "analysis_params.toml are provisional (doc/implementation-status.md)."
+            "for the D and H that label stands for. The primary rule is "
+            "4 days at 20 h (methods.md 5.2)."
         ) from missing
 
     return pd.read_csv(path, index_col="SEQN")

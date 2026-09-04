@@ -165,9 +165,16 @@ Ordered by how much damage they do if left.
             removed zero minutes not already excluded, in **both** cycles. A test asserts
             a 3-second minute is retained and that the parameter is absent, so re-adding
             the rule fails the suite.
-      - [ ] **Su 2022 valid-day rule** as a sensitivity analysis (§5.2, §8.4 item 2).
-            Free — it is D=3, H=16 through the same required arguments, so it needs a
-            run rather than any code.
+      - [x] **Su 2022 valid-day rule built** 2026-09-04 as `d03h16`, both cycles.
+            Primary 37 → 40 cases in H, broad 97 → 104, control pool 3,984 → 4,237;
+            cycle G broad 81 → 87. The two rules disagree on 5.7% of cycle H. Su is a
+            strict superset of the primary rule — 0 participants valid under `d04h20`
+            but not `d03h16`, which is the monotonicity check the looser thresholds
+            require. **Su's 40 cases are not a reason to make it primary**; that would
+            be a post-hoc substitution after seeing the count.
+            Validity tables now name their rule (`wear.rule_label`), so a sensitivity
+            rule cannot overwrite the primary one, and `save_validity` refuses to
+            replace an existing table without `--overwrite`.
       - [ ] **Johnson 2023 valid-day rule — deferred 2026-09-03, not dropped.** It needs
             structure the others do not: consecutive days, a total-daily-activity floor of
             200, and exclusion of a participant with **any** invalid day. Its wear

@@ -4,16 +4,25 @@ Decide which participants have a valid accelerometer recording (methods.md 5.2).
 
 Reads the whole PAXMIN table for a cycle, applies the minute-level exclusions
 of 5.1 and the noon-to-noon valid-day rule of 5.2, and writes one row per
-participant to data/processed/valid_recordings_{cycle}.csv. Everything
+participant to data/processed/valid_recordings_{cycle}_{rule}.csv. Everything
 downstream reads that file rather than rescanning 88 million rows.
 
+    # the primary rule (methods.md 5.2), settled 2026-09-03
     python scripts/build_validity.py --cohort H --min-valid-days 4 --min-wear-hours 20
 
-Both thresholds are REQUIRED and have no defaults. The values in
-analysis_params.toml follow Xiao 2023 but are provisional -- the researcher
-reserved the choice on 2026-09-02 (doc/implementation-status.md) -- and this
-script is the point at which the choice actually changes the study population.
-Pass them explicitly, and record the decision in doc/analysis-log.md.
+    # a pre-specified sensitivity rule, written alongside rather than over it
+    python scripts/build_validity.py --cohort H --min-valid-days 3 --min-wear-hours 16
+
+Both thresholds are REQUIRED and have no defaults, even though they are now
+settled: this script is the point at which the choice changes the study
+population, so every run states the rule it applied and the sensitivity runs
+read identically to the primary one. Record any decision in
+doc/analysis-log.md.
+
+Each rule writes its own file, named after the thresholds: 4 days at 20 h goes
+to valid_recordings_H_d04h20.csv and 3 at 16 to valid_recordings_H_d03h16.csv,
+so a sensitivity rule can never overwrite the primary one. An existing table is
+never replaced silently either -- pass --overwrite to do that deliberately.
 
 The output also carries `header_only_valid`, the verdict of the superseded
 PAXSTS == 1 and PAXLDAY == '9' rule, so the change in cohort membership can be
@@ -45,15 +54,23 @@ def parse_args():
         "--min-valid-days",
         type=int,
         required=True,
-        help="Valid days a participant needs (methods.md 5.2). No default: "
-             "the value is not settled, see doc/implementation-status.md",
+        help="Valid days a participant needs (methods.md 5.2). 4 for the "
+             "primary rule. No default even though it is settled: this is "
+             "where the choice changes the study population",
     )
     parser.add_argument(
         "--min-wear-hours",
         type=float,
         required=True,
         help="Hours of retained wear a day needs to be valid (methods.md 5.2). "
-             "No default, for the same reason",
+             "20 for the primary rule. No default, for the same reason",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace an existing table. Off by default: a validity table "
+             "defines the study population, so rewriting one changes what "
+             "every downstream result was computed from",
     )
     parser.add_argument(
         "--base-path",
@@ -68,10 +85,11 @@ def parse_args():
     return parser.parse_args()
 
 
-def write_provenance(save_dir, cycle, args, table):
+def write_provenance(save_dir, cycle, args, table, path):
     """Record the thresholds used, next to the file they produced."""
     record = {
         "cohort": cycle,
+        "rule_label": wear.rule_label(args.min_valid_days, args.min_wear_hours),
         "participants_assessed": int(len(table)),
         "participants_valid": int(table["meets_criterion"].sum()),
         "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -89,11 +107,48 @@ def write_provenance(save_dir, cycle, args, table):
         "packages": provenance.package_versions(),
     }
 
-    path = save_dir / f"valid_recordings_{cycle}.provenance.json"
-    with open(path, "w", encoding="utf-8") as f:
+    sidecar = path.with_suffix(".provenance.json")
+    with open(sidecar, "w", encoding="utf-8") as f:
         json.dump(record, f, indent=2)
 
-    return path
+    return sidecar
+
+
+PRIMARY_RULE = (4, 20)          # methods.md 5.2, settled 2026-09-03
+
+
+def compare_with_primary(table, cycle, args):
+    """
+    For a sensitivity rule, contrast it with the primary table.
+
+    This is the comparison the run exists for: how much of the study
+    population turns on the choice of threshold. Skipped when this IS the
+    primary rule, and skipped with a note when the primary table has not
+    been built -- the sensitivity rule is still valid on its own.
+    """
+    label = wear.rule_label(args.min_valid_days, args.min_wear_hours)
+    primary_label = wear.rule_label(*PRIMARY_RULE)
+
+    if label == primary_label:
+        return
+
+    try:
+        primary = wear.load_validity(cycle, primary_label, args.base_path)
+    except FileNotFoundError:
+        print(f"\n(no {primary_label} table to compare against)")
+        return
+
+    shared = table.index.intersection(primary.index)
+    this = table.loc[shared, "meets_criterion"].astype(bool)
+    that = primary.loc[shared, "meets_criterion"].astype(bool)
+
+    print(f"\nAgainst {primary_label}, over {len(shared)} shared participants:")
+    print(f"  valid under both                 : {int((this & that).sum())}")
+    print(f"  valid only under {label:<16}: {int((this & ~that).sum())}")
+    print(f"  valid only under {primary_label:<16}: {int((~this & that).sum())}")
+    print(f"  valid under neither              : {int((~this & ~that).sum())}")
+    print(f"  disagreement                     : "
+          f"{100 * (this != that).mean():.1f}% of participants")
 
 
 def report(table, args):
@@ -128,13 +183,17 @@ def build(cycle, args):
     )
 
     report(table, args)
+    compare_with_primary(table, cycle, args)
 
     if args.dry_run:
         print("\n[dry run] nothing written")
         return
 
-    path = wear.save_validity(table, cycle, args.base_path)
-    prov = write_provenance(path.parent, cycle, args, table)
+    path = wear.save_validity(
+        table, cycle, wear.rule_label(args.min_valid_days, args.min_wear_hours),
+        base_path=args.base_path, overwrite=args.overwrite,
+    )
+    prov = write_provenance(path.parent, cycle, args, table, path)
 
     print(f"\nWrote {path.name} and {prov.name}")
     print(f"  in {path.parent}")
@@ -146,7 +205,8 @@ def main():
     print(f"Data root: {paths.data_root(args.base_path)}")
     print(f"Commit   : {provenance.git_commit(short=True)}")
     print(f"Rule     : >= {args.min_valid_days} valid days "
-          f"of >= {args.min_wear_hours} h retained wear")
+          f"of >= {args.min_wear_hours} h retained wear"
+          f"   [{wear.rule_label(args.min_valid_days, args.min_wear_hours)}]")
 
     for cycle in (["G", "H"] if args.cohort == "all" else [args.cohort]):
         build(cycle, args)

@@ -23,6 +23,82 @@ Template:
 
 ---
 
+## 2026-09-04 — Su 2022 valid-day rule built as a sensitivity group; validity tables now name their rule
+
+**Ran:** `scripts/build_validity.py --cohort H|G --min-valid-days 3 --min-wear-hours 16`,
+the [Su_2022] rule pre-specified in §5.2 and §8.4 item 2. Both PAXMIN tables read end to
+end again. This PC, W: drive data. 163 tests pass. `results/` untouched; `freq_match_*.csv`
+not regenerated.
+
+**Output:** `data/processed/valid_recordings_{H,G}_d03h16.csv` with provenance sidecars.
+The primary tables were **renamed** to `valid_recordings_{H,G}_d04h20.csv` rather than
+rebuilt — their contents and sidecars are unchanged and already record D=4, H=20, so a
+second eight-minute pass would have produced identical files. Their sidecars therefore
+predate the `rule_label` field the new ones carry.
+
+**Filenames now name the rule.** `wear.rule_label(D, H)` derives `d04h20`, `d03h16`,
+`d05h20` from the thresholds, so a sensitivity rule cannot overwrite the primary table and
+a filename cannot disagree with the rule that produced it. Callers state which rule they
+want — `wear.load_validity(cycle, label)`, and `scripts/build_cohort.py --validity spec`
+now requires `--min-valid-days` and `--min-wear-hours`, which name the table it reads and
+land in the cohort's provenance. `save_validity` also refuses to replace an existing table
+without `--overwrite`, following `cohort._save_cases`: a validity table defines the study
+population, so rewriting one silently would change what every downstream result was
+computed from.
+
+**Found.**
+
+| | cycle H | cycle G |
+|---|---|---|
+| assessed | 7,776 | 6,917 |
+| valid, 9-day rule | 7,537 | 6,608 |
+| valid, **d04h20** (primary) | 6,385 | 5,926 |
+| valid, d03h16 (Su) | 6,831 | 6,258 |
+| disagreement between the two rules | 5.7% | 4.8% |
+
+Case level, which is what constrains the study:
+
+| definition | cycle | 9-day | **d04h20** | d03h16 | Su gain |
+|---|---|---|---|---|---|
+| **primary** | H | 44 | **37** | 40 | +3 |
+| narrow | H | 26 | 22 | 25 | +3 |
+| broad | H | 115 | 97 | 104 | +7 |
+| control pool | H | 4,601 | 3,984 | 4,237 | +253 |
+| broad | G | 87 | 81 | 87 | +6 |
+| `narrow_nocode` | G | 35 | 32 | 35 | +3 |
+
+**A logical check that passed, and would have caught a real bug.** Su is looser on *both*
+thresholds (3 < 4 days, 16 < 20 hours), so every participant valid under the primary rule
+must be valid under Su. Measured: **0 violations in both cycles** — `valid only under
+d04h20` is zero, at population and at case level. Su is a strict superset. A single
+violation would have meant the day-counting or threshold comparison was wrong; monotonicity
+is one of the few properties of this rule that can be checked without knowing the right
+answer, so it is worth asserting whenever a new rule is built.
+
+Candidate-day distributions are identical between the two rules (7,522 at seven in H), as
+they must be: candidate days are recording geometry and independent of D and H. A second
+free consistency check.
+
+**Named so it is not done quietly later.** Su yields **40** primary cases, back inside the
+"approximately 40–46" that §4.1 originally claimed before measurement corrected it to 37.
+That is **not** a reason to promote Su to primary. The thresholds were fixed before any of
+this was measured, and substituting the looser rule *after* seeing that it gives a more
+comfortable case count is precisely the post-hoc move pre-specification exists to prevent.
+d04h20 remains primary at 37 cases; d03h16 is reported as the sensitivity analysis it was
+always specified to be. Agreement between them is a stronger result than either alone.
+
+**Also fixed, found by compile-checking rather than by the tests:** `build_validity.py` had
+been left with an unterminated string literal — two newline escapes had been mangled into
+real newlines by an earlier edit. The 155-test suite passed throughout, because nothing
+imports the scripts. Worth remembering: `pytest` covers `src/`, not `scripts/`, so a script
+change needs a compile or a run to be checked at all.
+
+**Next:** Johnson 2023's rule remains deferred, and needs code the other two do not
+(consecutive days, an activity floor, exclusion on any invalid day). The case-definition
+wiring is still the substantive open item.
+
+---
+
 ## 2026-09-03 — Is the valid-day rule a differential selection mechanism on cases? No consistent evidence
 
 **Ran:** Descriptive comparison of wear and valid-day counts between cases and the

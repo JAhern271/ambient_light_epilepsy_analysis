@@ -5,14 +5,14 @@ Build the study cohort: identify cases and select frequency-matched controls.
 This produces the freq_match_*.csv files that every downstream analysis
 depends on. It was previously done by running notebook 03 by hand.
 
-    python scripts/build_cohort.py --validity spec --dry-run
-    python scripts/build_cohort.py --validity spec --cohort H
+    python scripts/build_cohort.py --validity spec --min-valid-days 4 --min-wear-hours 20 --cohort H --dry-run
     python scripts/build_cohort.py --validity legacy --cohort G
 
 `--validity` is required. 'spec' applies methods.md 5.2 and needs
-scripts/build_validity.py to have been run first, with the two thresholds
-chosen deliberately; 'legacy' applies the superseded PAXLDAY == '9' header
-rule and exists to reproduce the cohort files already in data/processed.
+scripts/build_validity.py to have been run first; the two thresholds name
+which of its tables to read, so the cohort records the rule it was built
+under. 'legacy' applies the superseded PAXLDAY == '9' header rule and
+exists to reproduce the cohort files already in data/processed.
 
 Sampling is seeded, so repeated runs reproduce the same cohort. Changing
 --seed, --control-ratio or --validity changes the study population: do it
@@ -51,11 +51,27 @@ def parse_args():
         help=f"Sampling seed (default: {matching.DEFAULT_SEED})",
     )
     parser.add_argument(
+        "--min-valid-days",
+        type=int,
+        default=None,
+        help="Valid days the validity table was built with (4 for the primary "
+             "rule). Required with --validity spec: it names which table to "
+             "read, so the cohort records the rule it was built under",
+    )
+    parser.add_argument(
+        "--min-wear-hours",
+        type=float,
+        default=None,
+        help="Retained wear hours per valid day (20 for the primary rule). "
+             "Required with --validity spec",
+    )
+    parser.add_argument(
         "--validity",
         choices=["spec", "legacy"],
         required=True,
         help="Which accelerometry validity rule decides eligibility. 'spec' is "
-             "methods.md 5.2, read from valid_recordings_{cycle}.csv (build it "
+             "methods.md 5.2, read from valid_recordings_{cycle}_{rule}.csv "
+             "(build it "
              "first with scripts/build_validity.py). 'legacy' is the superseded "
              "PAXSTS == 1 and PAXLDAY == '9' rule, for reproducing the existing "
              "cohort files. Required: the two rules select different study "
@@ -94,6 +110,8 @@ def write_provenance(save_dir, year, args, n_cases, n_controls):
             "min_age": matching.MIN_AGE,
             "match_cols": matching.MATCH_COLS,
             "validity_rule": args.validity,
+            "validity_min_valid_days": args.min_valid_days,
+            "validity_min_wear_hours": args.min_wear_hours,
         },
         "data_root": str(paths.data_root(args.base_path)),
         "machine": platform.node(),
@@ -118,9 +136,17 @@ def resolve_validity(year, args):
     in results/.
     """
     if args.validity == "spec":
-        table = wear.load_validity(year, args.base_path)
-        print(f"Validity rule                 : methods.md 5.2, from "
-              f"valid_recordings_{year}.csv")
+        if args.min_valid_days is None or args.min_wear_hours is None:
+            raise SystemExit(
+                "--validity spec needs --min-valid-days and --min-wear-hours, "
+                "which name the validity table to read. The primary rule is "
+                "4 and 20 (methods.md 5.2)."
+            )
+
+        label = wear.rule_label(args.min_valid_days, args.min_wear_hours)
+        table = wear.load_validity(year, label, args.base_path)
+        print(f"Validity rule                 : methods.md 5.2, "
+              f"from valid_recordings_{year}_{label}.csv")
         return wear.valid_seqns(table)
 
     header = wear.load_header(year, args.base_path)

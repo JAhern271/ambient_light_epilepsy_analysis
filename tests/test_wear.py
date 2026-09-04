@@ -53,6 +53,9 @@ LATE_TOTAL_MINUTES = 11_529
 LATE_CANDIDATE_DAYS = 7
 LATE_COVERAGE = [1170] + [1440] * 7 + [279]
 
+# The primary valid-day rule, as a filename label
+LABEL = "d04h20"
+
 
 def candidate_start(j, first_time=LATE_FIRST_TIME):
     """Minute index at which candidate day `j` (1-indexed) begins."""
@@ -776,10 +779,10 @@ def test_validity_table_round_trips_through_csv(tmp_path, monkeypatch):
     table = a_validity_table()
     expected = set(wear.valid_seqns(table))
 
-    path = wear.save_validity(table, "X")
+    path = wear.save_validity(table, "X", LABEL)
     assert path.exists()
 
-    reloaded = wear.load_validity("X")
+    reloaded = wear.load_validity("X", LABEL)
 
     assert reloaded["meets_criterion"].dtype == bool
     assert set(wear.valid_seqns(reloaded)) == expected == {73557.0, 73558.0}
@@ -811,4 +814,66 @@ def test_a_missing_validity_table_says_how_to_build_it(tmp_path, monkeypatch):
     monkeypatch.delenv("ALE_PROFILE", raising=False)
 
     with pytest.raises(FileNotFoundError, match="build_validity"):
-        wear.load_validity("X")
+        wear.load_validity("X", LABEL)
+
+
+# ---------------------------------------------------------------------------
+# Naming the rule (methods.md 5.2 pre-specifies several)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "days, hours, expected",
+    [
+        (4, 20, "d04h20"),          # the primary rule
+        (3, 16, "d03h16"),          # Su 2022
+        (5, 20, "d05h20"),          # Johnson 2023's thresholds
+        (4, 20.0, "d04h20"),        # a float from argparse must not change it
+        (10, 8, "d10h8"),           # two-digit days stay two digits
+        (3, 16.5, "d03h16p5"),      # fractional hours stay filename-safe
+    ],
+)
+def test_rule_label_names_the_thresholds(days, hours, expected):
+    """
+    The label is derived from D and H so a filename cannot disagree with the
+    rule that produced it. Several valid-day rules are pre-specified and each
+    defines a different study population, so a hand-written label would
+    eventually be wrong and the error would be invisible.
+    """
+    assert wear.rule_label(days, hours) == expected
+
+
+def test_different_rules_cannot_collide_on_one_filename():
+    """
+    The property that matters: a sensitivity rule must not be able to
+    overwrite the primary table.
+    """
+    primary = wear.validity_filename("H", wear.rule_label(4, 20))
+    su = wear.validity_filename("H", wear.rule_label(3, 16))
+
+    assert primary == "valid_recordings_H_d04h20.csv"
+    assert su == "valid_recordings_H_d03h16.csv"
+    assert primary != su
+
+
+def test_an_existing_table_is_not_overwritten_silently(tmp_path, monkeypatch):
+    """
+    A validity table defines the study population, so rewriting one changes
+    what every downstream result was computed from. It raises rather than
+    warning, because the caller is a script that would otherwise report counts
+    for a file it did not write.
+    """
+    monkeypatch.setenv("ALE_DATA_ROOT", str(tmp_path))
+    monkeypatch.delenv("ALE_PROFILE", raising=False)
+
+    table = a_validity_table()
+    wear.save_validity(table, "X", LABEL)
+
+    with pytest.raises(FileExistsError, match="study population"):
+        wear.save_validity(table, "X", LABEL)
+
+    # ... but a different rule writes alongside it, needing no overwrite
+    other = wear.save_validity(table, "X", wear.rule_label(3, 16))
+    assert other.name == "valid_recordings_X_d03h16.csv"
+
+    # and an explicit overwrite is allowed
+    wear.save_validity(table, "X", LABEL, overwrite=True)
