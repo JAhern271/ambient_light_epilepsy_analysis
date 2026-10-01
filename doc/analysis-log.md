@@ -23,6 +23,12 @@ Template:
 
 ---
 
+## 2026-10-01 — M10/L5 split case confirmed
+
+**Decision: the researcher's.** When no 10 h window is eligible but a 5 h one is, L5 and
+its start are reported, and M10, its start and RA are NaN. Not all-or-nothing. This
+confirms the behaviour committed in 9a29a94 (entry below); no code changed.
+
 ## 2026-10-01 — M10/L5 windows over clock times masked on every day
 
 **Ran:** a scratchpad counting script (not committed, writes nothing) over
