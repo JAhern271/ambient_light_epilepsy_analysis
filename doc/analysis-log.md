@@ -23,6 +23,18 @@ Template:
 
 ---
 
+## 2026-10-01 — Valid-day selection check stated in §10.3
+
+**Ran:** nothing; spec edit only.
+
+**What changed.** §10.3 now reports the 2026-09-03 differential-selection check next to
+its "non-differential … biases toward the null" sentence, which assumes what the check
+tested. Numbers are taken unchanged from that entry. The closing sentence — that 46 cases
+can exclude only a large differential — is new interpretation, not in the original entry.
+
+**Decision:** the researcher's. Claude drafted the wording; the researcher approved it as
+written.
+
 ## 2026-10-01 — Daytime minutes above 100, 250 and 1,000 lux, per valid day
 
 **Ran:** `pytest tests` (186 pass, real-data regression included). No data run. `results/`

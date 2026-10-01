@@ -304,7 +304,9 @@ Tracked here because they are edits to [methods.md](methods.md) rather than to c
 - [ ] **`PAXLUX_G` documentation** was never checked against `PAXLUX_H`, particularly the
       2,500 lux ceiling that §6.2 depends on. Now lower priority — cycle G is a
       replication cohort only — but it still needs doing before the G results are reported.
-- [ ] **State the valid-day selection check in §10.** The 2026-09-03 analysis-log entry
+- [x] **State the valid-day selection check in §10.** Done 2026-10-01: added to §10.3
+      after the non-differential sentence, wording drafted by Claude and approved as
+      written by the researcher. The 2026-09-03 analysis-log entry
       tested whether the valid-day rule excludes cases differentially — it costs 7 of 44
       primary cases, and ASM sedation or disability reducing tolerance for a wrist device
       would make the rule select on something plausibly caused by the exposure. It found
