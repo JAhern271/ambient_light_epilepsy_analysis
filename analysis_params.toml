@@ -23,6 +23,8 @@
 #               day_thresholds is what lux_metrics.minutes_above_thresholds
 #               takes, but no runner reads it yet. sensor_ceiling,
 #               night_categories and iv_transform not yet used
+#   [rest_activity]  min_window_coverage wired up 2026-10-01, used by
+#               lux_metrics.compute_lux_summary -> relative_amplitude
 #   everything else is still specification only.
 # Migration is tracked in doc/implementation-status.md. Until it is closed,
 # treat this file as normative and the literals as bugs.
@@ -114,6 +116,21 @@ masked_minutes = "raw"
 sensor_ceiling = 2500         # top-coded by the device; see methods.md 6.2
 night_categories = 3          # none / low / high, split at median among exposed
 iv_transform = "both"         # raw | log | both -- report both, methods.md 6.4
+
+[rest_activity]
+# doc/methods.md 6.5. M10, L5 and RA, used by lux_metrics.relative_amplitude on
+# either signal (activity for the outcomes, lux for the light analogue of M10).
+#
+# A clock time masked on EVERY day leaves a NaN bin in the 24 h profile. A
+# window's mean is taken over its non-NaN bins, and the window counts only if
+# at least this fraction of its bins are non-NaN. 20/24 mirrors the valid-day
+# rule (20 of 24 hours). TOML cannot write a fraction; this is the double that
+# 20 / 24 evaluates to, and a test pins the two equal. 1.0 would reproduce the
+# earlier behaviour of skipping any window that contains a NaN bin.
+# Decided by the researcher 2026-10-01, before any rest-activity metric was
+# computed on PAXMIN, when 0 of 4,085 eligible_H_primary_d04h20 participants
+# had such a bin; see methods.md 6.5 and doc/analysis-log.md.
+min_window_coverage = 0.8333333333333334
 
 [sleep]
 # doc/methods.md 6.6 -- secondary outcome family

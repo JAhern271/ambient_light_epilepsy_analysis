@@ -292,7 +292,10 @@ can compute at another resolution, but values are then not comparable across res
 sampling rates yield higher IV for the same underlying signal.
 
 M10 and L5 are computed on the average 24-hour profile with a circular extension, so
-windows crossing midnight are handled.
+windows crossing midnight are handled. A clock time masked on every day leaves a missing
+profile bin. Each window is averaged over its present bins and counts only if at least
+`rest_activity.min_window_coverage` (20/24) of them are present (methods §6.5). M10, L5
+or RA is NaN when no window qualifies.
 
 ## Derived cohort files
 

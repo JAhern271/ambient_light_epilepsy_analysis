@@ -23,6 +23,80 @@ Template:
 
 ---
 
+## 2026-10-01 — M10/L5 windows over clock times masked on every day
+
+**Ran:** a scratchpad counting script (not committed, writes nothing) over
+`eligible_H_primary_d04h20`, streaming PAXMIN_H through `wear.prepare_minutes` and
+`wear.summarise_days(min_wear_hours=20)`. Then `pytest tests` (212 pass, including the
+real-data regression test) and an exact `==` comparison of the six pinned cycle G PAXLUX
+participants. This PC, W: drive data. `results/` untouched. No M10, L5, RA or any lux or
+activity value was computed or looked at before the decision.
+
+**Found, counts only.** "All-masked" means no valid day has a retained minute at that
+clock minute.
+
+| | N | ≥1 all-masked clock minute (valid days) | same, all rows |
+|---|---|---|---|
+| cases | 37 | 0 | 0 |
+| controls | 4,048 | 0 | 0 |
+
+- **Positive control.** Forcing 12:00–12:59 to non-wear on every day for three real
+  participants gave exactly 60 all-masked minutes each, so the zero is not a counter bug.
+- **Margin.** In a 151-participant subset, the least-covered clock minute had data on at
+  least 2 valid days. The lux and activity masks agreed on every minute.
+- **Regression fixture.** All six pinned PAXLUX participants have no NaN rows and no
+  all-NaN profile bin. That was checked before implementing, not assumed.
+- **Not measured:** the d03h16 rule and cycle G PAXMIN.
+
+**Options presented** (clock fixture C2, 12:00–12:59 masked every day; truth M10 = 1000
+starting 480):
+- (a) Keep skipping any window containing a NaN bin: M10 545 at 780.
+- (b) Average over the window's non-NaN bins, eligible at coverage ≥ f. f ≤ 0.90 gives
+  1000 at 480. f = 0.95 gives 327000/570 = 573.68 at 750. The result jumps with f, so f
+  is a choice.
+- (c) NaN for the participant if any bin is all-masked. That breaks §5.3's same
+  analytic sample.
+- (d) What the packages do, checked in source. nparACT stops on any NA
+  (`nparACT_base.R`). GGIR's average day sets clock times with no data to 0
+  (`g.impute.R`), which gives 900 at 480 for C2 and risks a false daytime L5. GGIR part 6
+  computes LXMX per day, a different estimand.
+
+**Decision: the researcher's.** (b) with f = 20/24, mirroring the valid-day rule.
+Recorded as `rest_activity.min_window_coverage` and in methods §6.5.
+
+**Implementation.** `relative_amplitude(df, *, min_window_coverage)` is required, with no
+default. It uses `rolling(window, min_periods=k).mean()`, where pandas counts only
+non-NaN bins toward `min_periods`. `k` is the smallest count with `k / window ≥ f`, found
+by trying each count, because `ceil(20/24 * 600)` is 501 in floating point. The partial
+windows at the start of the doubled profile are blanked, so a fragment can never be
+eligible. M10 and L5 are judged separately. An eligible M10 implies an eligible L5, so
+the only split case is an L5 with no M10, which gives NaN for M10, its start, and RA.
+
+**Tests, hand-derived:**
+- C2 at 20/24 gives 1000 at 480. At 1.0 it gives 545 at 780, the old behaviour.
+- At 540/600 (inclusive) it gives 1000 at 480. At 541/600 it gives 324100/541 at 721.
+- Keeping only 22:00–04:00: M10 NaN, L5 0 at 1350.
+- Keeping only 08:00–12:00: everything NaN.
+- The sample-count helper is checked at both epochs. The argument has no default and
+  rejects values outside (0, 1].
+
+A further test covers a recording with no NaN: 0 lux 00:00–04:10, 1000 otherwise. By hand
+L5 = 166.67, starting at 00:00. The unblanked 250-minute fragment would give 0, so this
+shows why the blanking is needed even without masked data.
+
+**Deliberate faults.**
+- `>=` changed to `>` in the coverage comparison: 9 tests failed, including both sides
+  of the inclusive-threshold test and the old-behaviour test.
+- Blanking removed: the fragment test got L5 = 0, the derived fault value, and the
+  midnight tie-break test also failed.
+- Both reverted, and all 212 passed.
+
+**Regression: nothing moved.** All 13 fixture columns are `==`-identical, read with
+`float_precision="round_trip"`. The fixture was not regenerated.
+
+**Found in passing:** `intradaily_variability` has no NaN handling, so one masked minute
+makes IV NaN on PAXMIN. Added to implementation-status.md, not fixed.
+
 ## 2026-10-01 — M10/L5 clock times: starts, in circular minutes past midnight
 
 **Ran:** `pytest tests` (195 pass, including the real-data regression test). This PC,

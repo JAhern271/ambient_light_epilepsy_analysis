@@ -100,20 +100,27 @@ Ordered by how much damage they do if left.
             undefined when tied. Pinned as current behaviour by
             `test_l5_tie_across_midnight_resolves_to_the_first_window_after_midnight`.
             Researcher's decision.
-      - [ ] **A clock time masked on every day takes every window containing it out
-            of contention.** Its profile point is NaN, the rolling mean is NaN for every
-            window containing it, and those windows are skipped without warning. Someone who
-            removes the device at the same time every night can pass the 20 h rule and
-            still have L5 pushed out of the night. Options: keep that behaviour, average
-            over the window's non-NaN minutes subject to a minimum coverage, or NaN for
-            the participant. Pinned as current behaviour by
-            `test_a_minute_masked_on_every_day_excludes_windows_containing_it`.
-            Researcher's decision; needed before rest–activity metrics run on PAXMIN.
+      - [x] **A clock time masked on every day takes every window containing it out
+            of contention.** Done 2026-10-01. A window's mean is now taken over its
+            non-NaN minutes, and the window is eligible if at least 20/24 of them are
+            present (`rest_activity.min_window_coverage`, §6.5). It is a required
+            argument of `relative_amplitude`, with no default. The researcher chose this
+            over keeping the old behaviour, NaN for the participant, or GGIR's zero-fill.
+            Measured first: 0 of 4,085 `eligible_H_primary_d04h20` participants (0 of 37
+            cases) have such a minute on valid days, so it is a safeguard. Regression
+            fixture bit-identical on all 13 columns. See the 2026-10-01 entry in
+            [analysis-log.md](analysis-log.md).
       - [ ] **`relative_amplitude` (and IS/IV) use every row, not valid days only.** The
             threshold metric restricts to valid days; the nonparametric metrics do not.
             The participant-level runner should pass only valid-day minutes, or the
             functions should take the `wear.summarise_days` table as
             `minutes_above_thresholds` does.
+      - [ ] **`intradaily_variability` has no NaN handling.** It uses `np.mean` and
+            `np.diff` on the raw values, so a single masked minute makes IV NaN on
+            PAXMIN. The six regression-fixture PAXLUX recordings have no NaN, so the
+            test suite cannot show it.
+            Found 2026-10-01; needs a rule (e.g. differences only between adjacent
+            present epochs) and a synthetic test before IV runs on PAXMIN.
 - [x] **Night window disagrees with the spec.** Done 2026-10-01. `compute_lux_summary`
       reads `light.day_window` and `light.night_window`; the `7, 19` and `20, 5` literals
       and both function defaults (including the third value, 22:00–05:00) are gone, so

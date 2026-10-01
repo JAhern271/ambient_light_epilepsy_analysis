@@ -25,6 +25,7 @@ def compute_lux_summary(seqn_array, year, base_path=None, downsample="5min"):
 
     # Day and night windows, read once for the whole cohort
     light = params.section("light")
+    rest_activity = params.section("rest_activity")
 
     if downsample == "5min":
         cols = ["timestamp", "mean_lux"]
@@ -97,8 +98,11 @@ def compute_lux_summary(seqn_array, year, base_path=None, downsample="5min"):
             mins_per_day_above = time_above_threshold_normalized(df, threshold=threshold)
     
             # Calculate m10, l5, the relative amplitude, and the clock times
-            # at which M10 and L5 start (circular minutes past midnight)
-            m10, l5, ra, m10_start_minutes, m10_start_time, l5_start_minutes, l5_start_time = relative_amplitude(df)
+            # at which M10 and L5 start (circular minutes past midnight).
+            # Window coverage rule from analysis_params.toml (methods.md 6.5).
+            m10, l5, ra, m10_start_minutes, m10_start_time, l5_start_minutes, l5_start_time = relative_amplitude(
+                df, min_window_coverage=rest_activity["min_window_coverage"]
+            )
     
             # Calculate IS and IV
             IS = interdaily_stability(df)
@@ -391,7 +395,25 @@ def window_start(window_end_index, window_samples, samples_per_day, epoch_minute
     return start_minutes, start_time
 
 
-def relative_amplitude(df):
+def min_samples_for_coverage(window_samples, min_window_coverage):
+    """
+    Fewest non-NaN profile bins a window of `window_samples` bins needs to
+    meet `min_window_coverage`, the smallest k with k / window >= coverage.
+
+    Found by trying each k in turn rather than by ceil(coverage * window),
+    because 20/24 is not exact in floating point: 0.8333... * 600 comes out
+    as 500.00000000000006, and ceil() of that is 501, not 500. A single
+    division is rounded correctly, so 500 / 600 and 20 / 24 give the same
+    float and compare equal, as they should.
+    """
+    for k in range(window_samples + 1):
+        if k / window_samples >= min_window_coverage:
+            return k
+    # Unreachable for coverage <= 1, which relative_amplitude has checked
+    raise ValueError(f"No count meets coverage {min_window_coverage}")
+
+
+def relative_amplitude(df, *, min_window_coverage):
     """
     M10, L5, relative amplitude, and the clock times at which M10 and L5 start
     (methods.md 6.5).
@@ -400,6 +422,20 @@ def relative_amplitude(df):
     across days). M10 is the highest mean over any 10 h stretch of that
     profile and L5 the lowest over any 5 h stretch, with windows allowed to
     run across midnight. RA = (M10 - L5) / (M10 + L5).
+
+    A clock time masked (NaN) on EVERY day leaves its profile bin NaN. A
+    window's mean is then taken over its non-NaN bins, and the window is
+    eligible only if at least `min_window_coverage` of its bins are non-NaN
+    (methods.md 6.5; rest_activity.min_window_coverage, 20/24, decided
+    2026-10-01). Example: 12:00-12:59 masked every day leaves the 08:00-18:00
+    window with 540 of 600 minutes, coverage 0.90, so it is still eligible
+    and its mean is the mean of those 540 minutes. A bin with data on even
+    one day is not NaN, so this rule only bites on minutes masked on every
+    day. If no 10 h window is eligible, M10 and its start are NaN; likewise
+    for L5; RA is NaN if either is.
+
+    A coverage of 1.0 reproduces the earlier behaviour, in which any window
+    containing a NaN bin was skipped.
 
     The start times are minutes past midnight, 0-1439, and they are CIRCULAR
     (methods.md 8.2). L5 typically starts either side of midnight, so two
@@ -415,8 +451,6 @@ def relative_amplitude(df):
       - Ties go to the first window found scanning from 00:00, so a tied
         stretch that crosses midnight starts at 00:00, not at its own start.
         Common for L5 on lux, where a dark room reads exactly 0.
-      - A clock time that is masked (NaN) on every day leaves that profile
-        point NaN, and no window containing it is eligible.
       - Every row passed in is used, valid day or not; restricting to valid
         days is the caller's job for now.
 
@@ -425,6 +459,9 @@ def relative_amplitude(df):
     df : pandas DataFrame
         'timestamp' and 'mean_lux' (or any signal under that name), NaN where
         a sample is masked.
+    min_window_coverage : float, 0 < x <= 1
+        Fraction of a window's profile bins that must be non-NaN for the
+        window to count. No default: read rest_activity.min_window_coverage.
 
     Returns
     -------
@@ -432,6 +469,10 @@ def relative_amplitude(df):
         (m10, l5, ra, m10_start_minutes, m10_start_time,
          l5_start_minutes, l5_start_time)
     """
+    if not 0 < min_window_coverage <= 1:
+        raise ValueError(
+            f"min_window_coverage must be in (0, 1], got {min_window_coverage!r}"
+        )
 
     df = df.copy()
     df = df.sort_values("timestamp")
@@ -464,21 +505,51 @@ def relative_amplitude(df):
     # midnight. Each rolling mean is labelled by the window's LAST sample.
     extended = np.concatenate([values, values])
 
-    m10_roll = pd.Series(extended).rolling(m10_window).mean()
-    l5_roll = pd.Series(extended).rolling(l5_window).mean()
+    # pandas' rolling mean skips NaN, and `min_periods` counts only non-NaN
+    # bins, so this is exactly "the mean over the window's non-NaN bins,
+    # NaN unless enough of them are present". With no NaN bin every window is
+    # full and this is the same computation as a plain rolling mean.
+    m10_roll = pd.Series(extended).rolling(
+        m10_window,
+        min_periods=min_samples_for_coverage(m10_window, min_window_coverage),
+    ).mean()
+    l5_roll = pd.Series(extended).rolling(
+        l5_window,
+        min_periods=min_samples_for_coverage(l5_window, min_window_coverage),
+    ).mean()
 
-    m10 = m10_roll.max()
-    l5 = l5_roll.min()
+    # The first window-1 positions of `extended` are partial windows at the
+    # start of the first copy. Each is a fragment of a full window that
+    # appears whole later on (in the second copy), so it must never be
+    # eligible in its own right; with min_periods below the window length it
+    # could be, so blank them.
+    m10_roll.iloc[:m10_window - 1] = np.nan
+    l5_roll.iloc[:l5_window - 1] = np.nan
 
+    # M10 and L5 are judged separately. If one has no eligible window, it and
+    # its start are NaN (and RA with it), but the other is still reported.
+    # An eligible M10 always implies an eligible L5 -- one half of a 10 h
+    # window holds at least half its non-NaN bins -- so in practice the only
+    # split case is an L5 with no M10.
+    if m10_roll.isna().all():
+        m10, m10_start_minutes, m10_start_time = np.nan, np.nan, None
+    else:
+        m10 = m10_roll.max()
+        # idxmax returns the first window on a tie (see docstring)
+        m10_start_minutes, m10_start_time = window_start(
+            m10_roll.idxmax(), m10_window, samples_per_day, epoch_minutes
+        )
+
+    if l5_roll.isna().all():
+        l5, l5_start_minutes, l5_start_time = np.nan, np.nan, None
+    else:
+        l5 = l5_roll.min()
+        l5_start_minutes, l5_start_time = window_start(
+            l5_roll.idxmin(), l5_window, samples_per_day, epoch_minutes
+        )
+
+    # NaN if either side is NaN
     ra = (m10 - l5) / (m10 + l5)
-
-    # idxmax / idxmin return the first window on a tie (see docstring)
-    m10_start_minutes, m10_start_time = window_start(
-        m10_roll.idxmax(), m10_window, samples_per_day, epoch_minutes
-    )
-    l5_start_minutes, l5_start_time = window_start(
-        l5_roll.idxmin(), l5_window, samples_per_day, epoch_minutes
-    )
 
     return (
         m10,

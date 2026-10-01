@@ -396,6 +396,18 @@ def test_minutes_above_thresholds_through_the_wear_chain():
 # M10, L5 and relative amplitude
 # ---------------------------------------------------------------------------
 
+# Window coverage rule, rest_activity.min_window_coverage (methods.md 6.5)
+COVERAGE = params.section("rest_activity")["min_window_coverage"]
+
+
+def test_window_coverage_is_the_decided_one():
+    """
+    Pins rest_activity.min_window_coverage to 20/24, decided 2026-10-01. TOML
+    holds it as a decimal, so this also checks that the decimal is exactly the
+    double 20 / 24 evaluates to, not a nearby one.
+    """
+    assert COVERAGE == 20 / 24
+
 def test_square_wave_m10_l5_and_ra():
     """
     With 12 h at 1000 lux and 12 h at 0, a 10 h window fits entirely inside
@@ -403,7 +415,7 @@ def test_square_wave_m10_l5_and_ra():
     """
     df = square_wave(days=7, high=1000.0, low=0.0, on_hour=6, off_hour=18)
 
-    m10, l5, ra, *_ = lm.relative_amplitude(df)
+    m10, l5, ra, *_ = lm.relative_amplitude(df, min_window_coverage=COVERAGE)
 
     assert m10 == pytest.approx(1000.0)
     assert l5 == pytest.approx(0.0)
@@ -414,7 +426,7 @@ def test_constant_recording_has_zero_relative_amplitude():
     """No day-night difference means M10 == L5 and RA == 0."""
     df = make_recording(np.full(7 * 288, 100.0))
 
-    m10, l5, ra, *_ = lm.relative_amplitude(df)
+    m10, l5, ra, *_ = lm.relative_amplitude(df, min_window_coverage=COVERAGE)
 
     assert m10 == pytest.approx(l5)
     assert ra == pytest.approx(0.0)
@@ -432,7 +444,7 @@ def test_m10_start_is_five_hours_before_the_peak(sinusoid_recording):
     A sinusoid peaking at midday puts the brightest 10 h window at 07:00-17:00,
     so it starts 420 minutes after midnight, to within one epoch.
     """
-    m10_start = lm.relative_amplitude(sinusoid_recording)[M10_START]
+    m10_start = lm.relative_amplitude(sinusoid_recording, min_window_coverage=COVERAGE)[M10_START]
 
     assert m10_start == pytest.approx(420.0, abs=10.0)
 
@@ -443,7 +455,7 @@ def test_l5_start_is_before_midnight_for_a_trough_at_midnight(sinusoid_recording
     21:30-02:30 and starts at 1290 minutes: the late end of the scale, for a
     window centred on its early end. That is why the value is circular.
     """
-    l5_start = lm.relative_amplitude(sinusoid_recording)[L5_START]
+    l5_start = lm.relative_amplitude(sinusoid_recording, min_window_coverage=COVERAGE)[L5_START]
 
     assert l5_start == pytest.approx(1290.0, abs=10.0)
 
@@ -453,8 +465,8 @@ def test_m10_start_tracks_a_shifted_peak(sinusoid_recording):
     values = sinusoid_recording["mean_lux"].to_numpy()
     shifted = make_recording(np.roll(values, 3 * 12))  # 3 h at 5 min epochs
 
-    baseline_start = lm.relative_amplitude(sinusoid_recording)[M10_START]
-    shifted_start = lm.relative_amplitude(shifted)[M10_START]
+    baseline_start = lm.relative_amplitude(sinusoid_recording, min_window_coverage=COVERAGE)[M10_START]
+    shifted_start = lm.relative_amplitude(shifted, min_window_coverage=COVERAGE)[M10_START]
 
     assert shifted_start - baseline_start == pytest.approx(180.0, abs=10.0)
 
@@ -474,7 +486,7 @@ def test_m10_start_on_a_plateau_picks_the_earliest_window():
     """
     df = square_wave(days=7, on_hour=6, off_hour=18)
 
-    m10_start = lm.relative_amplitude(df)[M10_START]
+    m10_start = lm.relative_amplitude(df, min_window_coverage=COVERAGE)[M10_START]
 
     assert m10_start == pytest.approx(360.0)  # 06:00
 
@@ -520,7 +532,7 @@ def clock_fixture_a_recording(days=7):
 def test_l5_straddling_midnight_starts_before_midnight():
     """Clock fixture A, every output checked against the hand-derived values."""
     m10, l5, ra, m10_start, m10_time, l5_start, l5_time = lm.relative_amplitude(
-        clock_fixture_a_recording()
+        clock_fixture_a_recording(), min_window_coverage=COVERAGE
     )
 
     assert m10 == pytest.approx(1000.0)
@@ -548,7 +560,7 @@ def test_l5_tie_across_midnight_resolves_to_the_first_window_after_midnight():
     ])
     df = make_recording(np.tile(day, 7), epoch_minutes=1)
 
-    result = lm.relative_amplitude(df)
+    result = lm.relative_amplitude(df, min_window_coverage=COVERAGE)
 
     assert result[1] == pytest.approx(0.0)
     assert result[L5_START] == 0.0  # 00:00
@@ -564,7 +576,7 @@ def test_a_minute_masked_on_one_day_does_not_move_the_windows():
     values[day3:day3 + 60] = np.nan
     df = make_recording(values, epoch_minutes=1)
 
-    result = lm.relative_amplitude(df)
+    result = lm.relative_amplitude(df, min_window_coverage=COVERAGE)
 
     assert result[0] == pytest.approx(1000.0)
     assert result[1] == pytest.approx(0.0)
@@ -572,28 +584,166 @@ def test_a_minute_masked_on_one_day_does_not_move_the_windows():
     assert result[L5_START] == 1350.0
 
 
-def test_a_minute_masked_on_every_day_excludes_windows_containing_it():
-    """
-    Clock fixture C2. Documents current behaviour rather than asserting correctness;
-    see the masked-bin item in doc/implementation-status.md.
-
-    NaN 12:00-12:59 on every day leaves those profile minutes NaN, and no
-    window containing one is eligible. The 08:00-18:00 window is lost, and
-    the best remaining 10 h window is 13:00-23:00, by hand:
-        5 h at 1000 + 4.5 h at 100 + 0.5 h at 0 = 5450 lux-hours / 10 = 545
-    against 445 for the best window ending by 12:00 (02:00-12:00).
-    """
+def clock_fixture_c2_recording():
+    """Clock fixture A with 12:00-12:59 masked (NaN) on every one of 7 days."""
     values = np.tile(CLOCK_FIXTURE_A, 7)
     for day in range(7):
         noon = day * 1440 + hhmm(12)
         values[noon:noon + 60] = np.nan
-    df = make_recording(values, epoch_minutes=1)
+    return make_recording(values, epoch_minutes=1)
 
-    result = lm.relative_amplitude(df)
+
+def clock_fixture_keep_only(start, end):
+    """Clock fixture A with every minute outside [start, end) NaN on every day."""
+    day = CLOCK_FIXTURE_A.copy()
+    keep = np.zeros(1440, dtype=bool)
+    if start < end:
+        keep[start:end] = True
+    else:
+        keep[start:] = True
+        keep[:end] = True
+    day[~keep] = np.nan
+    return make_recording(np.tile(day, 7), epoch_minutes=1)
+
+
+@pytest.mark.parametrize("window, coverage, expected", [
+    (600, 20 / 24, 500),   # M10 at 1-minute epochs
+    (300, 20 / 24, 250),   # L5 at 1-minute epochs
+    (120, 20 / 24, 100),   # M10 at 5-minute epochs
+    (60, 20 / 24, 50),     # L5 at 5-minute epochs
+    (600, 1.0, 600),       # every bin required
+    (600, 0.9, 540),
+])
+def test_min_samples_for_coverage(window, coverage, expected):
+    """
+    By hand: 20/24 of 600 is 500 exactly. ceil(0.8333... * 600) would give
+    501, because the product is 500.00000000000006 in floating point.
+    """
+    assert lm.min_samples_for_coverage(window, coverage) == expected
+
+
+def test_a_minute_masked_on_every_day_is_averaged_over_the_rest_of_the_window():
+    """
+    Clock fixture C2 under the decided rule (20/24, methods.md 6.5).
+
+    The 08:00-18:00 window has 540 of its 600 minutes, coverage 0.90 >= 0.833,
+    so it is eligible, and its mean over those 540 minutes is 1000. No window
+    can beat 1000, and no other window averages exactly 1000 (07:00-17:00 is
+    (60*100 + 480*1000)/540 = 900; 08:30-18:30 is (510*1000 + 30*100)/540
+    = 950), so M10 = 1000 starting 08:00, as without the mask. L5 does not
+    touch noon: 0 starting 22:30, RA = 1.
+    """
+    m10, l5, ra, m10_start, _, l5_start, _ = lm.relative_amplitude(
+        clock_fixture_c2_recording(), min_window_coverage=COVERAGE
+    )
+
+    assert m10 == pytest.approx(1000.0)
+    assert m10_start == 480.0   # 08:00
+    assert l5 == pytest.approx(0.0)
+    assert l5_start == 1350.0   # 22:30
+    assert ra == pytest.approx(1.0)
+
+
+def test_full_coverage_reproduces_the_previous_behaviour():
+    """
+    Clock fixture C2 with coverage 1.0: any window containing a NaN bin is
+    skipped, which is what the function did before 2026-10-01. The best
+    window clear of noon is 13:00-23:00, by hand:
+        5 h at 1000 + 4.5 h at 100 + 0.5 h at 0 = 5450 lux-hours / 10 = 545
+    against 445 for the best window ending by 12:00 (02:00-12:00).
+    """
+    result = lm.relative_amplitude(
+        clock_fixture_c2_recording(), min_window_coverage=1.0
+    )
 
     assert result[0] == pytest.approx(545.0)
     assert result[M10_START] == 780.0  # 13:00
-    assert result[L5_START] == 1350.0  # L5 does not touch noon
+    assert result[L5_START] == 1350.0
+
+
+@pytest.mark.parametrize("coverage, m10, m10_start", [
+    # 540 of 600 bins is exactly 0.90, so the 08:00 window is eligible
+    (540 / 600, 1000.0, 480.0),
+    # One bin more is needed: 08:00-18:00 is out. A window may now hold at
+    # most 59 NaN minutes. Best is 12:01-22:01: 59 NaN, 300 min at 1000,
+    # 241 min at 100, so (300000 + 24100) / 541. (02:59-12:59, the best
+    # window ending inside the gap, is (27000 + 240000) / 541 = 493.5.)
+    (541 / 600, 324100.0 / 541, 721.0),
+])
+def test_coverage_threshold_is_inclusive(coverage, m10, m10_start):
+    """Clock fixture C2 either side of the 08:00 window's own coverage."""
+    result = lm.relative_amplitude(
+        clock_fixture_c2_recording(), min_window_coverage=coverage
+    )
+
+    assert result[0] == pytest.approx(m10)
+    assert result[M10_START] == m10_start
+
+
+def test_l5_without_an_eligible_m10_window():
+    """
+    Clock fixture A keeping only 22:00-04:00 (6 h). A 10 h window holds at
+    most 360 non-NaN minutes, below 500, so M10 is NaN and RA with it. The
+    5 h window 22:30-03:30 is complete and all 0, so L5 = 0 starting 22:30.
+    Every other window with 250+ minutes of data includes some 100 lux.
+    """
+    m10, l5, ra, m10_start, m10_time, l5_start, l5_time = lm.relative_amplitude(
+        clock_fixture_keep_only(hhmm(22), hhmm(4)), min_window_coverage=COVERAGE
+    )
+
+    assert np.isnan(m10) and np.isnan(m10_start) and m10_time is None
+    assert np.isnan(ra)
+    assert l5 == pytest.approx(0.0)
+    assert l5_start == 1350.0
+
+
+def test_no_eligible_window_gives_nan():
+    """
+    Clock fixture A keeping only 08:00-12:00 (240 min): fewer than the 250 a
+    5 h window needs, so neither M10 nor L5 has an eligible window.
+    """
+    m10, l5, ra, m10_start, m10_time, l5_start, l5_time = lm.relative_amplitude(
+        clock_fixture_keep_only(hhmm(8), hhmm(12)), min_window_coverage=COVERAGE
+    )
+
+    assert np.isnan(m10) and np.isnan(l5) and np.isnan(ra)
+    assert np.isnan(m10_start) and np.isnan(l5_start)
+    assert m10_time is None and l5_time is None
+
+
+def test_a_partial_window_at_the_start_of_the_profile_is_never_eligible():
+    """
+    No NaN anywhere: 0 lux 00:00-04:10 (250 min), 1000 lux otherwise.
+
+    Every full 5 h window holds at most those 250 zeros plus 50 minutes at
+    1000, so by hand L5 = 50 * 1000 / 300 = 166.67. Windows starting 23:10
+    to 00:00 all tie at that value, and the first one found is the window
+    starting 00:00. The 250-minute fragment 00:00-04:10 at the very start of
+    the doubled profile meets 20/24 coverage by count, and would give L5 = 0
+    if it were allowed to count as a window.
+    """
+    day = minute_profile([(0, hhmm(4, 10), 0.0)], base=1000.0)
+    df = make_recording(np.tile(day, 7), epoch_minutes=1)
+
+    m10, l5, ra, m10_start, _, l5_start, _ = lm.relative_amplitude(
+        df, min_window_coverage=COVERAGE
+    )
+
+    assert l5 == pytest.approx(50 * 1000 / 300)
+    assert l5_start == 0.0
+    assert m10 == pytest.approx(1000.0)
+
+
+def test_window_coverage_has_no_default():
+    with pytest.raises(TypeError):
+        lm.relative_amplitude(clock_fixture_a_recording())
+
+
+@pytest.mark.parametrize("coverage", [0, -0.5, 1.01])
+def test_impossible_window_coverage_raises(coverage):
+    with pytest.raises(ValueError):
+        lm.relative_amplitude(clock_fixture_a_recording(),
+                              min_window_coverage=coverage)
 
 
 def test_sampling_interval_survives_a_missing_second_row():
@@ -606,7 +756,7 @@ def test_sampling_interval_survives_a_missing_second_row():
 
     assert lm.get_sampling_interval_minutes(df) == 1.0
 
-    result = lm.relative_amplitude(df)
+    result = lm.relative_amplitude(df, min_window_coverage=COVERAGE)
 
     assert result[0] == pytest.approx(1000.0)
     assert result[M10_START] == 480.0
@@ -624,7 +774,7 @@ def test_a_clock_minute_absent_on_every_day_does_not_shift_later_times():
     at_0500 = (df["timestamp"].dt.hour == 5) & (df["timestamp"].dt.minute == 0)
     df = df[~at_0500].reset_index(drop=True)
 
-    result = lm.relative_amplitude(df)
+    result = lm.relative_amplitude(df, min_window_coverage=COVERAGE)
 
     assert result[M10_START] == 480.0
     assert result[L5_START] == 1350.0
@@ -652,7 +802,7 @@ def test_clock_start_times_are_circular_not_linear():
     for l5_from in (hhmm(23), hhmm(1)):
         day = minute_profile([(l5_from, (l5_from + 300) % 1440, 0.0)])
         df = make_recording(np.tile(day, 7), epoch_minutes=1)
-        starts.append(lm.relative_amplitude(df)[L5_START])
+        starts.append(lm.relative_amplitude(df, min_window_coverage=COVERAGE)[L5_START])
 
     assert starts == [1380.0, 60.0]
 
