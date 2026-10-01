@@ -23,6 +23,27 @@ Template:
 
 ---
 
+## 2026-10-01 — Masked daytime minutes counted raw, not rescaled
+
+**Ran:** `pytest tests`. No data run. `results/` untouched.
+
+**Decision: the researcher's.** In the time-above-threshold metric (§6.2), a masked minute
+inside the 07:00–19:00 window counts as not above any threshold, and the day's count is
+not scaled up to the full window. Recorded as `light.masked_minutes = "raw"` and in §6.2.
+
+**Options as presented.** On a day with 600 of 720 window minutes retained, 300 of them
+above 1,000 lux: raw gives 300; rescaling gives 300 / 600 × 720 = 360. Raw means a day with
+more masked daytime minutes can score lower for that reason alone. Rescaling assumes the
+masked minutes resembled the retained ones, which fails if the device is removed at
+characteristic times (bathing indoors, outdoor sport). The 2026-09-03 check found similar
+retained fractions in cases and controls (median 0.96 and 0.95), measured over whole days
+rather than the daytime window. A wear-only check of masked *daytime* minutes by group was
+offered and not taken up.
+
+**Pre-specification.** Taken before any light metric was computed on PAXMIN, so no
+outcome had been seen. `rescale` stays in the code, tested, but is not part of the
+specification and no sensitivity analysis was added.
+
 ## 2026-10-01 — Valid-day selection check stated in §10.3
 
 **Ran:** nothing; spec edit only.

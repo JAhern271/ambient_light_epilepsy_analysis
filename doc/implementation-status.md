@@ -227,15 +227,14 @@ Ordered by how much damage they do if left.
       day, and averages across valid days. The superseded function survives for the frozen
       PAXLUX route, now reading `light.primary_day_threshold` (same value; fixture
       unchanged). Nothing yet calls the new function on real data — that waits for the
-      participant-level runner and for the item below.
-      - [ ] **Masked minutes inside the day window: raw count or rescaled?** Open,
-            researcher's decision, deferred 2026-10-01. A valid day can have up to 4 h
-            masked. `raw` counts only retained minutes above the threshold, so less wear
-            reads as less light; `rescale` multiplies by window / retained window minutes,
-            assuming the masked minutes resembled the retained ones. Implemented as a
-            required `masked_minutes` argument with no default, both branches tested
-            (300 vs 360 on the same day), so nothing can run until this is chosen. Once
-            chosen, record it in `[light]` and the spec §6.2.
+      participant-level runner.
+      - [x] **Masked minutes inside the day window: raw.** Decided by the researcher
+            2026-10-01, before any light metric was computed on real data. A masked
+            minute counts as not above any threshold, and the day's count is not scaled
+            up. Recorded as `light.masked_minutes` and in §6.2; pinned by a test. The
+            function keeps `masked_minutes` as a required argument, so callers read it
+            from `[light]`; `rescale` remains implemented and tested but is not part of
+            the specification.
 - [ ] **Proportion of daytime minutes at the 2,500 lux ceiling** (spec §6.2, secondary).
 - [ ] **Day–night light contrast** (spec §6.2).
 - [ ] **Categorical nighttime light** — none / low / high, split at the median among the

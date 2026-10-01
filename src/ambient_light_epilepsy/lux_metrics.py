@@ -260,9 +260,9 @@ def time_above_threshold_normalized(df, threshold):
     return mins_per_day_above
 
 
-# The two ways a masked minute inside the day window can be treated. Which one
-# the analysis uses is an open decision (doc/implementation-status.md), so it
-# is a required argument with no default.
+# The two ways a masked minute inside the day window can be treated. The
+# analysis uses "raw" (light.masked_minutes, decided 2026-10-01); it stays a
+# required argument with no default, so callers read it from [light].
 MASKED_MINUTE_RULES = ("raw", "rescale")
 
 
@@ -294,7 +294,7 @@ def minutes_above_thresholds(prepared, days, *, thresholds, day_window,
           rescale  the count is scaled up by (window minutes / retained
                    window minutes), which assumes the masked minutes looked
                    like the retained ones.
-        No default: the choice has not been made yet.
+        No default: read light.masked_minutes ("raw", decided 2026-10-01).
 
     Returns
     -------

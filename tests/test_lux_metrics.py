@@ -272,6 +272,15 @@ def test_day_thresholds_are_the_specified_ones():
     assert LIGHT["primary_day_threshold"] == 1000
 
 
+def test_masked_minute_rule_is_the_decided_one():
+    """
+    Pins light.masked_minutes to "raw", decided 2026-10-01 (methods.md 6.2),
+    and checks it is a value the function accepts.
+    """
+    assert LIGHT["masked_minutes"] == "raw"
+    assert LIGHT["masked_minutes"] in lm.MASKED_MINUTE_RULES
+
+
 @pytest.mark.parametrize("rule", lm.MASKED_MINUTE_RULES)
 def test_minutes_above_thresholds_fixture_a(rule):
     """

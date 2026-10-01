@@ -106,6 +106,11 @@ night_window = [23, 6]        # 23:00-06:00, wraps midnight
 # 19:00-23:00 and 06:00-07:00 are excluded from both, not assigned to either.
 day_thresholds = [100, 250, 1000]   # lux; minutes per day above each
 primary_day_threshold = 1000  # designated primary endpoint BEFORE analysis
+# A masked minute inside the day window is not counted as above any threshold
+# ("raw"), rather than the day's count being scaled up to the full window
+# ("rescale"). Decided by the researcher 2026-10-01, before any light metric
+# was computed on real data; see methods.md 6.2 and doc/analysis-log.md.
+masked_minutes = "raw"
 sensor_ceiling = 2500         # top-coded by the device; see methods.md 6.2
 night_categories = 3          # none / low / high, split at median among exposed
 iv_transform = "both"         # raw | log | both -- report both, methods.md 6.4
