@@ -269,8 +269,8 @@ Computed per participant by `lux_metrics.compute_lux_summary`.
 |---|---|
 | `duration_hours` | Span from first to last sample |
 | `mean_lux` | Mean across the whole recording |
-| `mean_daytime_lux` | Mean over hours 07:00–18:59 |
-| `mean_nighttime_lux` | Mean over hours 20:00–04:59 |
+| `mean_daytime_lux` | Mean over hours 07:00–18:59 (`light.day_window`) |
+| `mean_nighttime_lux` | Mean over hours 23:00–05:59 (`light.night_window`; 20:00–04:59 before 2026-10-01) |
 | `time_above_threshold` | Fraction of epochs above 1000 lux, expressed as minutes per day |
 | `M10` | Highest 10-hour rolling mean of the average 24 h profile |
 | `L5` | Lowest 5-hour rolling mean of the average 24 h profile |
