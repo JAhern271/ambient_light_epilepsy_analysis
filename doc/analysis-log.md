@@ -23,6 +23,34 @@ Template:
 
 ---
 
+## 2026-10-01 — Night window set to the specified 23:00–06:00
+
+**Ran:** `pytest tests` (177 pass, including the cycle-G real-data regression test) and
+`tests/regenerate_regression_fixture.py`. This PC, W: drive data. `results/` untouched.
+
+**Output:** `tests/data/regression_expected.csv`, regenerated.
+
+**What changed.** `lux_metrics.compute_lux_summary` now reads the day and night windows
+from `analysis_params.toml [light]` (07:00–19:00 and 23:00–06:00, methods.md §6.1). It
+used to pass 20:00–05:00 as a literal, and `compute_mean_nighttime_lux` carried a third,
+unused default of 22:00–05:00. Both functions now require the window as an argument.
+
+**Equivalence check.** Before regenerating, all 12 metric columns of the six pinned
+participants were compared at rtol 1e-9: **only `mean_nighttime_lux` changed**; the other
+11 were identical, and the regenerated file differs from the old one in that column alone.
+New nighttime values are lower for five of six (e.g. 0.95 → 0.05 lux), consistent with
+the 20:00–22:59 evening hours dropping out; one rises (1.82 → 2.04), so that participant's
+23:00–05:59 is brighter on average than their 20:00–04:59. Not investigated further.
+
+**Tests.** Hand-derived fixtures: night mean of hourly values 0–23 is 38/7; light only at
+06, 19–22 h leaves both means at 0; a masked (NaN) hour is skipped, not counted as dark.
+A second route through `wear.prepare_minutes` on synthetic PAXMIN gives exactly 100 lux
+under the new window against 400 under the old one. Injecting an off-by-one into the
+wrap-around (`<=` for `<`) fails four tests.
+
+**Next:** the PAXLUX `results/` remain on the old window and stay superseded. Light
+thresholds next.
+
 ## 2026-10-01 — Case definitions wired into the cohort; the analysis now uses the primary definition
 
 **Ran:** `cohort.find_cases` for all five available cycle/definition combinations, then

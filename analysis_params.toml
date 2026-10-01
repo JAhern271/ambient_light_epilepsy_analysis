@@ -18,8 +18,9 @@
 #   [validity]  wired up, used by wear.py -- except min_valid_days and
 #               min_wear_hours, which are recorded here but passed explicitly
 #               by every caller on purpose (see that section)
-#   everything else is still specification only, and several call sites carry
-#   contradicting literals -- the night window most seriously.
+#   [light]     day_window and night_window wired up 2026-10-01, used by
+#               lux_metrics.compute_lux_summary; the rest of [light] not yet
+#   everything else is still specification only.
 # Migration is tracked in doc/implementation-status.md. Until it is closed,
 # treat this file as normative and the literals as bugs.
 

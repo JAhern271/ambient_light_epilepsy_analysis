@@ -12,13 +12,29 @@ import pandas as pd
 import pytest
 
 from ambient_light_epilepsy import lux_metrics as lm
+from ambient_light_epilepsy import params, wear
 
-from conftest import make_recording, square_wave
+from conftest import make_paxmin, make_recording, set_minutes, square_wave
 
 
 # ---------------------------------------------------------------------------
 # Day and night windows
 # ---------------------------------------------------------------------------
+
+LIGHT = params.section("light")
+DAY_START, DAY_END = LIGHT["day_window"]
+NIGHT_START, NIGHT_END = LIGHT["night_window"]
+
+
+def test_light_windows_are_the_specified_ones():
+    """
+    Pins analysis_params.toml [light] to methods.md 6.1: day 07:00-19:00,
+    night 23:00-06:00. Changing either changes every light metric, so the
+    change should have to pass through this test, and through a log entry.
+    """
+    assert LIGHT["day_window"] == [7, 19]
+    assert LIGHT["night_window"] == [23, 6]
+
 
 def test_daytime_window_is_07_to_19():
     """Daytime is hours 07:00-18:59 inclusive; 19:00 is excluded."""
@@ -26,27 +42,117 @@ def test_daytime_window_is_07_to_19():
     values = np.arange(24, dtype=float)
     df = make_recording(values, epoch_minutes=60)
 
-    result = lm.compute_mean_daytime_lux(df, day_start=7, day_end=19)
+    result = lm.compute_mean_daytime_lux(df, day_start=DAY_START, day_end=DAY_END)
 
-    assert result == pytest.approx(np.mean(np.arange(7, 19)))
+    # mean of 7, 8, ..., 18
+    assert result == pytest.approx(12.5)
 
 
-def test_nighttime_window_wraps_midnight():
-    """Night spans 20:00-04:59, i.e. it must cross midnight."""
+def test_nighttime_window_is_23_to_06_and_wraps_midnight():
+    """Night is 23:00-05:59, so it must cross midnight."""
     values = np.arange(24, dtype=float)
     df = make_recording(values, epoch_minutes=60)
 
-    result = lm.compute_mean_nighttime_lux(df, night_start=20, night_end=5)
+    result = lm.compute_mean_nighttime_lux(
+        df, night_start=NIGHT_START, night_end=NIGHT_END
+    )
 
-    expected_hours = list(range(20, 24)) + list(range(0, 5))
-    assert result == pytest.approx(np.mean(expected_hours))
+    # mean of 23, 0, 1, 2, 3, 4, 5 = 38 / 7
+    assert result == pytest.approx(38 / 7)
+
+
+def test_dusk_and_dawn_hours_belong_to_neither_window():
+    """
+    06:00-06:59 and 19:00-22:59 are excluded from both windows (methods.md
+    6.1). Light only in those hours must leave both means at zero.
+    """
+    values = np.zeros(24)
+    values[[6, 19, 20, 21, 22]] = 1000.0
+    df = make_recording(values, epoch_minutes=60)
+
+    assert lm.compute_mean_daytime_lux(
+        df, day_start=DAY_START, day_end=DAY_END
+    ) == 0.0
+    assert lm.compute_mean_nighttime_lux(
+        df, night_start=NIGHT_START, night_end=NIGHT_END
+    ) == 0.0
+
+
+def test_masked_minutes_are_skipped_not_counted_as_dark():
+    """
+    A masked minute arrives as NaN (wear.mask_minutes). It must drop out of
+    the mean rather than count as 0 lux: with 23:00 masked, the night mean is
+    the mean of hours 0-5, which is 2.5.
+    """
+    values = np.arange(24, dtype=float)
+    values[23] = np.nan
+    df = make_recording(values, epoch_minutes=60)
+
+    assert lm.compute_mean_nighttime_lux(
+        df, night_start=NIGHT_START, night_end=NIGHT_END
+    ) == pytest.approx(2.5)
+
+
+def test_windows_have_no_default():
+    """The window must come from the caller, i.e. from [light]."""
+    df = make_recording(np.arange(24, dtype=float), epoch_minutes=60)
+
+    with pytest.raises(TypeError):
+        lm.compute_mean_daytime_lux(df)
+    with pytest.raises(TypeError):
+        lm.compute_mean_nighttime_lux(df)
+
+
+@pytest.mark.parametrize("start, end", [(5, 5), (24, 6), (23, -1)])
+def test_impossible_windows_raise(start, end):
+    """Equal ends, or an hour outside 0-23, cannot be what was meant."""
+    df = make_recording(np.arange(24, dtype=float), epoch_minutes=60)
+
+    with pytest.raises(ValueError):
+        lm.compute_mean_nighttime_lux(df, night_start=start, night_end=end)
+
+
+def test_nighttime_window_on_prepared_paxmin_minutes():
+    """
+    Second route to the night window, through the frame the analysis really
+    uses: raw PAXMIN records passed through wear.prepare_minutes.
+
+    100 lux throughout, except 1000 lux from 20:00 to 22:59 on every calendar
+    day. Those hours are outside 23:00-06:00, so the night mean is exactly
+    100. The superseded 20:00-05:00 window would have taken them in and
+    given 400:
+
+        20-22 h: 8 evenings x 180 min = 1,440 min at 1000 lux
+        23 h:    8 x 60  =   480 min at 100
+        00-04 h: 8 x 300 = 2,400 min at 100
+        (1,440 x 1000 + 2,880 x 100) / 4,320 = 400
+
+    The recording starts at 16:30, so 20:00 on calendar day k (from 0) is
+    minute 210 + 1440 k; the last calendar day ends at 16:39, giving 8
+    evenings.
+    """
+    minutes = make_paxmin(first_time="16:30:00", lux=100.0)
+    for k in range(8):
+        minutes = set_minutes(minutes, 210 + 1440 * k, 180, PAXLXMM=1000.0)
+
+    prepared = wear.prepare_minutes(minutes, "16:30:00")
+
+    assert lm.compute_mean_nighttime_lux(
+        prepared, night_start=NIGHT_START, night_end=NIGHT_END
+    ) == pytest.approx(100.0)
+    # The superseded window, to show the fixture distinguishes the two
+    assert lm.compute_mean_nighttime_lux(
+        prepared, night_start=20, night_end=5
+    ) == pytest.approx(400.0)
 
 
 def test_daytime_returns_nan_when_no_samples_in_window():
     """A recording with no daytime samples gives NaN, not an error or zero."""
     df = make_recording(np.ones(4), start="2013-06-01 00:00:00", epoch_minutes=60)
 
-    assert np.isnan(lm.compute_mean_daytime_lux(df, day_start=7, day_end=19))
+    assert np.isnan(
+        lm.compute_mean_daytime_lux(df, day_start=DAY_START, day_end=DAY_END)
+    )
 
 
 # ---------------------------------------------------------------------------

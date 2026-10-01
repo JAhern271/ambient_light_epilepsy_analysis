@@ -84,10 +84,13 @@ Ordered by how much damage they do if left.
       the exact error the spec (§8.2) criticises in Tang 2024 and Bailey 2023, because L5
       straddles the wraparound. **The affected values are already in `results/`.** Fix the
       metric, then handle group comparison with circular statistics.
-- [ ] **Night window disagrees with the spec.** Code uses 20:00–05:00
-      (`lux_metrics.py:81`); the spec §6.1 fixes it at 23:00–06:00. The unused default on
-      `compute_mean_nighttime_lux` is a third value (22:00–05:00). Resolve by moving both
-      windows into `analysis_params.toml` and deleting the literals.
+- [x] **Night window disagrees with the spec.** Done 2026-10-01. `compute_lux_summary`
+      reads `light.day_window` and `light.night_window`; the `7, 19` and `20, 5` literals
+      and both function defaults (including the third value, 22:00–05:00) are gone, so
+      the window is now a required argument. One shared `in_clock_window` helper handles
+      the midnight wrap and rejects impossible windows. Regression fixture regenerated:
+      only `mean_nighttime_lux` moved, the other 11 columns bit-identical. See the
+      2026-10-01 entry in [analysis-log.md](analysis-log.md).
 - [ ] **Mean daytime/nighttime lux are reported as primary metrics.** Spec §6.2 rules
       them out as primaries because the sensor top-codes at 2,500 lux; they are retained
       only as caveated secondaries.
@@ -131,9 +134,9 @@ Ordered by how much damage they do if left.
       **4,048**, since §4.2 applies no ASM exclusion under the primary definition.
 - [ ] **`analysis_params.toml` is read for `[cohort]` and `[validity]` only.** `params.py`
       is the mechanism; `[cohort]` was wired up 2026-09-02 and `[validity]` on 2026-09-03
-      by `wear.py`. `[light]`, `[sleep]`, `[matching]`, `[survey]` and `[multiplicity]` are
-      still specification-only, and the literals that contradict them are the night-window
-      and threshold items above. Note `min_valid_days` and `min_wear_hours` are settled
+      by `wear.py`. `[light]` windows on 2026-10-01; the rest of `[light]`, and `[sleep]`,
+      `[matching]`, `[survey]` and `[multiplicity]`, are still specification-only. The
+      remaining contradicting literal is the 1,000 lux threshold below. Note `min_valid_days` and `min_wear_hours` are settled
       but deliberately *not* read as defaults — see the valid-day item below.
 - [x] **Non-wear and valid-day handling.** Done 2026-09-03, together with the
       participant-level validity item below. New `wear.py` implements §5.1 and §5.2:

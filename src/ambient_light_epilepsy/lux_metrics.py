@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
 
-from . import paths
+from . import params, paths
 
 
 def compute_lux_summary(seqn_array, year, base_path=None, downsample="5min"):
@@ -22,7 +22,10 @@ def compute_lux_summary(seqn_array, year, base_path=None, downsample="5min"):
     """
     
     results = []
-    
+
+    # Day and night windows, read once for the whole cohort
+    light = params.section("light")
+
     if downsample == "5min":
         cols = ["timestamp", "mean_lux"]
     elif downsample is None:
@@ -74,11 +77,18 @@ def compute_lux_summary(seqn_array, year, base_path=None, downsample="5min"):
             # Calculate mean light exposure (not actually useful, may remove)
             mean_lux = df["mean_lux"].mean()
             
-            # Calculate mean daytime light exposure
-            daytime_lux = compute_mean_daytime_lux(df, day_start=7, day_end=19)
-            
-            # Calculate mean nightitme light exposure
-            nighttime_lux = compute_mean_nighttime_lux(df, night_start=20, night_end=5)
+            # Calculate mean daytime light exposure. The windows come from
+            # analysis_params.toml [light] (methods.md 6.1), never a literal.
+            day_start, day_end = light["day_window"]
+            daytime_lux = compute_mean_daytime_lux(
+                df, day_start=day_start, day_end=day_end
+            )
+
+            # Calculate mean nighttime light exposure
+            night_start, night_end = light["night_window"]
+            nighttime_lux = compute_mean_nighttime_lux(
+                df, night_start=night_start, night_end=night_end
+            )
     
             # Calculate the time above threshold LUX level
             threshold = 1000
@@ -117,16 +127,46 @@ def compute_lux_summary(seqn_array, year, base_path=None, downsample="5min"):
 
 
 
-def compute_mean_daytime_lux(df, day_start=7, day_end=19):
+def in_clock_window(hours, start, end):
+    """
+    True for each hour of the clock that falls inside [start, end).
+
+    `start` is inclusive and `end` exclusive, so (7, 19) covers 07:00-18:59.
+    A window whose start is later than its end wraps midnight: (23, 6) covers
+    23:00-05:59.
+
+    Raises for a window that cannot be what was meant -- an hour outside
+    0-23, or start == end, which would be either an empty window or the whole
+    day depending on how it is read.
+    """
+    for hour in (start, end):
+        if not 0 <= hour <= 23:
+            raise ValueError(f"Window hour {hour!r} is outside 0-23")
+    if start == end:
+        raise ValueError(f"Window ({start}, {end}) has the same start and end")
+
+    if start < end:
+        # Does not cross midnight
+        return (hours >= start) & (hours < end)
+
+    # Crosses midnight
+    return (hours >= start) | (hours < end)
+
+
+def compute_mean_daytime_lux(df, *, day_start, day_end):
     """
     Computes mean daytime lux.
+
+    The window has no default on purpose: the value belongs in
+    analysis_params.toml [light] day_window (methods.md 6.1), and a default
+    here is how a second, contradicting window once crept in.
 
     Parameters
     ----------
     df : pandas DataFrame
         Must contain columns:
             - 'timestamp' (datetime)
-            - 'mean_lux'
+            - 'mean_lux'   NaN for a masked minute, which is skipped
     day_start : int
         Start hour (inclusive)
     day_end : int
@@ -140,7 +180,7 @@ def compute_mean_daytime_lux(df, day_start=7, day_end=19):
 
     hours = df["timestamp"].dt.hour
 
-    mask = (hours >= day_start) & (hours < day_end)
+    mask = in_clock_window(hours, day_start, day_end)
 
     if mask.sum() == 0:
         return np.nan
@@ -148,18 +188,19 @@ def compute_mean_daytime_lux(df, day_start=7, day_end=19):
     return df.loc[mask, "mean_lux"].mean()
 
 
-def compute_mean_nighttime_lux(df, night_start=22, night_end=5):
+def compute_mean_nighttime_lux(df, *, night_start, night_end):
     """
     Computes mean nighttime lux.
 
-    Handles windows that cross midnight.
+    Handles windows that cross midnight. As for the daytime window, there is
+    no default: read analysis_params.toml [light] night_window.
 
     Parameters
     ----------
     df : pandas DataFrame
         Must contain columns:
             - 'timestamp' (datetime)
-            - 'mean_lux'
+            - 'mean_lux'   NaN for a masked minute, which is skipped
     night_start : int
         Start hour (inclusive)
     night_end : int
@@ -173,12 +214,7 @@ def compute_mean_nighttime_lux(df, night_start=22, night_end=5):
 
     hours = df["timestamp"].dt.hour
 
-    if night_start < night_end:
-        # Does NOT cross midnight
-        mask = (hours >= night_start) & (hours < night_end)
-    else:
-        # Crosses midnight (e.g., 22–05)
-        mask = (hours >= night_start) | (hours < night_end)
+    mask = in_clock_window(hours, night_start, night_end)
 
     if mask.sum() == 0:
         return np.nan
