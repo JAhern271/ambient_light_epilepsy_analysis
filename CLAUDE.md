@@ -34,8 +34,9 @@ in several cases still reflects the superseded design.
   lists live in `analysis_params.toml`, not in `cohort.py`. The 12-name `asm_broad` list
   is the **broad** definition — it has a PPV of 38.9% against G40 and is for cycle G
   replication and sensitivity analysis only. Never present it as the primary definition.
-  Note `matching.eligible_participants` still *defaults* to the legacy broad file, so
-  passing `definition="primary"` is currently required to get the primary cohort.
+  `matching.eligible_participants` takes `definition` as a **required** argument since
+  2026-10-01 — one of `cohort.DEFINITIONS` or `"legacy"` — so nothing inherits a
+  definition. `scripts/build_cohort.py` requires `--definition` and `--validity`.
 - **Cycle G is a labelled broad-definition replication cohort**, not part of the primary
   analysis.
 - **Python for metrics, R for statistics**, with a participant-level CSV at the boundary.

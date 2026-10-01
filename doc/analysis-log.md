@@ -23,6 +23,78 @@ Template:
 
 ---
 
+## 2026-10-01 — Case definitions wired into the cohort; the analysis now uses the primary definition
+
+**Ran:** `cohort.find_cases` for all five available cycle/definition combinations, then
+`scripts/build_cohort.py` for each. This PC, W: drive data. 169 tests pass. `results/`
+untouched; `freq_match_*.csv` untouched.
+
+**Output:** `cases_{H,G}_{definition}.csv` (five, with provenance sidecars) and
+`eligible_{cycle}_{definition}_d04h20.csv` (five, with sidecars), in `data/processed`.
+
+**What changed.** `matching.eligible_participants` takes `definition` as a **required**
+argument, one of `cohort.DEFINITIONS` or `matching.LEGACY_DEFINITION`; an unknown value
+raises rather than falling through. `scripts/build_cohort.py` requires `--definition` and
+`--validity`. Until now the superseded combination — the drug-first legacy case list and
+the `PAXLDAY == '9'` validity rule — was reachable by saying nothing at all, which is how
+a dry run reported 97 PWE when the specification's cohort is 37.
+
+**The output is the eligible analytic sample, not a matched set.** Decided by the
+researcher. §8.1 matches on the propensity score with `MatchIt` in R and §9 puts the whole
+statistical layer there, so Python's job is to say who is eligible and which of them are
+cases; R decides who is compared with whom. Frequency matching is retired and now runs
+only under `--frequency-match`, which exists to reproduce the February files. Writing the
+new cohort under names that carry the definition and the validity rule was preferred to
+overwriting those files, because seven notebooks and scripts read them by name and would
+otherwise have silently begun loading a different study population.
+
+**Found.**
+
+| cycle | definition | eligible | cases | controls |
+|---|---|---|---|---|
+| H | **primary** | 4,085 | **37** | 4,048 |
+| H | narrow | 4,085 | 22 | 4,063 |
+| H | broad | 4,085 | 97 | 3,988 |
+| G | broad | 4,032 | 81 | 3,951 |
+| G | `narrow_nocode` | 4,032 | 32 | 4,000 |
+
+**Checks, all passed before the files were believed.**
+
+1. **Second route to the case counts.** 37 / 22 / 97 / 81 / 32 reproduce the 2026-09-04
+   figures exactly, through a different path: those were computed in memory by
+   `find_cases(save=False)`, these by writing case files and reading them back through
+   `load_cases`.
+2. **Case-list counts match the pinned figures** — primary 70, narrow 38, broad 157 in H;
+   broad 123, `narrow_nocode` 42 in G — the values in `data-sources.md` and in
+   `tests/test_cohort.py`.
+3. **The eligible pool is identical across definitions within a cycle** (4,085 in H,
+   4,032 in G). It must be: eligibility is age and accelerometry validity, and has
+   nothing to do with who counts as a case. A difference would have meant the case list
+   was leaking into the pool.
+4. **Narrow cases are a strict subset of primary** (22 of 37). Both require a G40 code and
+   narrow restricts the drug list, so the nesting is forced.
+5. **Equivalence of the legacy path**, per CLAUDE.md's rule about proving equivalence
+   before changing behaviour: `--definition legacy --validity legacy --frequency-match`
+   reproduces the February cohort exactly — **110 cases and 393 controls** in cycle H,
+   **82 and 276** in cycle G, matching the committed files row for row.
+
+**A correction to the two entries below.** They report a cycle-H control pool of
+**3,984**. That number excludes the union of *all* definitions' cases, which approximates
+§4.2's **sensitivity** control definition — "excluding control participants taking any ASM
+for a non-G40 indication". The **primary** control pool is **4,048**, because §4.2 applies
+no ASM exclusion under the primary definition: a participant taking topiramate for
+migraine is an eligible control. Both numbers are correct for their own question; the
+earlier entries called 3,984 the control pool without that qualification, and anything
+quoting them should use 4,048 for the primary analysis.
+
+**Next:** the §6 measures, none of which are built on PAXMIN yet — light thresholds at 100
+and 250 lux, proportion at the 2,500 lux ceiling, day–night contrast, categorical
+nighttime light, and the rest–activity metrics on `PAXMTSM`. Those produce the
+participant-level CSV that §9 hands to R, which is the last thing standing between this
+cohort and an analysis.
+
+---
+
 ## 2026-09-04 — Su 2022 valid-day rule built as a sensitivity group; validity tables now name their rule
 
 **Ran:** `scripts/build_validity.py --cohort H|G --min-valid-days 3 --min-wear-hours 16`,

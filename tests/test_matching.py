@@ -60,9 +60,12 @@ def fake_sources(monkeypatch, demographics):
     monkeypatch.setattr(matching.nhn, "load_partial_demo",
                         lambda *a, **k: demo)
     monkeypatch.setattr(matching.nhn, "add_demo_labels", lambda df: df)
-    # 1000-1002 are cases; 1003 onwards are potential controls
+    # 1000-1002 are cases; 1003 onwards are potential controls. Both case
+    # sources are stubbed: the legacy file and a named definition's file.
     monkeypatch.setattr(matching.ch, "load_pwe_seqn",
                         lambda *a, **k: pd.DataFrame([1000, 1001, 1002]))
+    monkeypatch.setattr(matching.ch, "load_cases",
+                        lambda *a, **k: pd.Index([1000, 1001, 1002], name="SEQN"))
 
     return demo
 
@@ -73,26 +76,53 @@ def test_only_participants_with_a_valid_recording_are_eligible(fake_sources):
     1002 has a valid recording but is withheld here; 1000 is age-ineligible.
     """
     df_all, df_pwe = matching.eligible_participants(
-        "X", valid_seqns=[1000, 1001, 1003]
+        "X", valid_seqns=[1000, 1001, 1003], definition="primary"
     )
 
     assert list(df_pwe.index) == [1001]          # 1000 too young, 1002 invalid
     assert set(df_all.index) == {1001, 1003}     # 1000 too young
 
 
-def test_validity_is_required_and_has_no_default():
+def test_validity_and_definition_are_both_required():
     """
-    methods.md 5.2 decides this, and its two thresholds are unsettled
-    (doc/implementation-status.md), so no caller may fall back to a default.
-    The superseded PAXLDAY == '9' rule used to be applied here silently.
+    Each names a different study population, and the superseded combination --
+    the legacy drug-first case list and the PAXLDAY == '9' validity rule --
+    was once reachable by saying nothing at all.
     """
     with pytest.raises(TypeError):
         matching.eligible_participants("X")
 
+    with pytest.raises(TypeError):
+        matching.eligible_participants("X", valid_seqns=[1, 2])
+
+
+def test_an_unknown_case_definition_raises(fake_sources):
+    """A typo must not fall through to some default case list."""
+    with pytest.raises(ValueError, match="Unknown case definition"):
+        matching.eligible_participants(
+            "X", valid_seqns=[1000, 1001], definition="primry"
+        )
+
+
+def test_the_legacy_definition_reads_the_superseded_file(fake_sources):
+    """
+    'legacy' is the drug-first list behind everything in results/. It stays
+    reachable so those files remain reproducible, but only when asked for by
+    name -- it has a positive predictive value of 38.9% against G40.
+    """
+    _, df_pwe = matching.eligible_participants(
+        "X", valid_seqns=[1000, 1001, 1003],
+        definition=matching.LEGACY_DEFINITION,
+    )
+
+    assert list(df_pwe.index) == [1001]
+
 
 def test_an_empty_validity_set_yields_an_empty_cohort(fake_sources):
     """Not an exception: a cycle with no valid recordings has no cohort."""
-    df_all, df_pwe = matching.eligible_participants("X", valid_seqns=[])
+    df_all, df_pwe = matching.eligible_participants(
+        "X", valid_seqns=[], definition="primary"
+    )
 
     assert df_all.empty
     assert df_pwe.empty
@@ -286,3 +316,77 @@ def test_saved_files_round_trip(cases_and_pool, tmp_path, monkeypatch):
     assert control_path.exists() and case_path.exists()
     assert list(pd.read_csv(control_path, index_col=0).iloc[:, 0]) == list(controls.index)
     assert list(pd.read_csv(case_path, index_col=0).iloc[:, 0]) == list(selected.index)
+
+
+# ---------------------------------------------------------------------------
+# The eligible analytic sample
+# ---------------------------------------------------------------------------
+
+def test_eligible_filename_names_both_choices():
+    """
+    Two things decide who is in a cohort: the case definition and the
+    valid-day rule. Both are in the filename, so a cohort built under
+    different choices cannot overwrite another.
+    """
+    assert matching.eligible_filename("H", "primary", "d04h20") == (
+        "eligible_H_primary_d04h20.csv"
+    )
+    assert matching.eligible_filename("H", "broad", "d03h16") != (
+        matching.eligible_filename("H", "primary", "d04h20")
+    )
+
+
+def test_eligible_sample_round_trips_with_case_status(tmp_path, monkeypatch,
+                                                      demographics):
+    """
+    The file is one row per eligible participant with an `epilepsy` flag, not
+    two SEQN lists: eligibility and case status are one table.
+    """
+    monkeypatch.setenv("ALE_DATA_ROOT", str(tmp_path))
+    monkeypatch.delenv("ALE_PROFILE", raising=False)
+
+    df_all = demographics
+    df_pwe = demographics.iloc[:40]
+
+    path = matching.save_eligible_sample(df_all, df_pwe, "X", "primary", "d04h20")
+    assert path.name == "eligible_X_primary_d04h20.csv"
+
+    back = matching.load_eligible_sample("X", "primary", "d04h20")
+
+    assert len(back) == len(df_all)
+    assert back["epilepsy"].sum() == len(df_pwe)
+    assert set(back.index[back["epilepsy"] == 1]) == set(df_pwe.index)
+    assert back.index.name == "SEQN"
+
+
+def test_an_existing_cohort_is_not_overwritten_silently(tmp_path, monkeypatch,
+                                                        demographics):
+    """
+    Same reasoning as `wear.save_validity`: this file defines the study
+    population, so replacing one changes what every downstream result was
+    computed from.
+    """
+    monkeypatch.setenv("ALE_DATA_ROOT", str(tmp_path))
+    monkeypatch.delenv("ALE_PROFILE", raising=False)
+
+    df_all, df_pwe = demographics, demographics.iloc[:40]
+    matching.save_eligible_sample(df_all, df_pwe, "X", "primary", "d04h20")
+
+    with pytest.raises(FileExistsError, match="study population"):
+        matching.save_eligible_sample(df_all, df_pwe, "X", "primary", "d04h20")
+
+    # a different definition or rule writes alongside it, needing no overwrite
+    other = matching.save_eligible_sample(df_all, df_pwe, "X", "broad", "d04h20")
+    assert other.name == "eligible_X_broad_d04h20.csv"
+
+    matching.save_eligible_sample(
+        df_all, df_pwe, "X", "primary", "d04h20", overwrite=True
+    )
+
+
+def test_a_missing_cohort_says_how_to_build_it(tmp_path, monkeypatch):
+    monkeypatch.setenv("ALE_DATA_ROOT", str(tmp_path))
+    monkeypatch.delenv("ALE_PROFILE", raising=False)
+
+    with pytest.raises(FileNotFoundError, match="build_cohort"):
+        matching.load_eligible_sample("X", "primary", "d04h20")

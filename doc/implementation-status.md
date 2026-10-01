@@ -94,21 +94,41 @@ Ordered by how much damage they do if left.
 
 ### Missing
 
-- [ ] **The new case definitions are not yet the cohort the analysis uses.**
-      `cohort.find_cases` exists and is tested, but `matching.eligible_participants`
-      still defaults to the legacy `people_with_epilepsy_{cycle}.csv` — the `broad`
-      definition — and `scripts/build_cohort.py` has no `--definition` flag. Deliberate:
-      the switch changes the study population, so it is its own commit. Wiring is one
-      argument (`definition=`, already accepted by `eligible_participants`); the work is
-      in deciding what to do with the existing `freq_match_*` files rather than in the
-      code. **Nothing downstream uses the primary definition until this is done.**
-- [ ] **Cohort files are still built on the legacy case definition.** With validity now
-      wired, `scripts/build_cohort.py --validity spec --cohort H` runs end to end, but
-      `definition=None` still means the drug-first `broad` list, so its dry run reports 97
-      PWE rather than 37. Switching the case definition and switching the validity rule in
-      one step would make the resulting cohort change uninterpretable, so the definition
-      wiring stays its own commit — see the item above it. `freq_match_*.csv` deliberately
-      **not** regenerated.
+- [x] **The case definitions are now the cohort the analysis uses.** Done 2026-10-01.
+      `matching.eligible_participants` takes `definition` as a **required** argument —
+      one of `cohort.DEFINITIONS` or `matching.LEGACY_DEFINITION` — so nothing inherits a
+      definition, and an unknown one raises. `scripts/build_cohort.py` requires
+      `--definition` and `--validity`; the superseded combination used to be reachable by
+      saying nothing at all.
+
+      **The output is the eligible analytic sample, not a matched set.**
+      `eligible_{cycle}_{definition}_{rule}.csv` holds one row per eligible participant
+      with an `epilepsy` flag. §8.1 matches on the propensity score in R and §9 puts the
+      statistical layer there, so Python says who is eligible and R decides who is
+      compared with whom. Frequency matching is retired and now runs only under
+      `--frequency-match`, which exists to reproduce the February files.
+
+      Built for five cohorts, all at `d04h20`:
+
+      | cycle | definition | eligible | cases | controls |
+      |---|---|---|---|---|
+      | H | **primary** | 4,085 | **37** | 4,048 |
+      | H | narrow | 4,085 | 22 | 4,063 |
+      | H | broad | 4,085 | 97 | 3,988 |
+      | G | broad | 4,032 | 81 | 3,951 |
+      | G | `narrow_nocode` | 4,032 | 32 | 4,000 |
+
+      Case counts reproduce the 2026-09-04 figures through a different code path, and
+      three structural checks pass: the eligible pool is identical across definitions
+      within a cycle, narrow cases are a strict subset of primary (22 of 37), and the
+      legacy path still reproduces the February cohort exactly (110/393 in H, 82/276 in
+      G). `freq_match_*.csv` untouched.
+
+      **A correction to the earlier log.** The 2026-09-03 and 2026-09-04 entries report a
+      cycle-H control pool of 3,984. That figure excludes the union of *all* definitions'
+      cases, which approximates §4.2's **sensitivity** control definition ("excluding
+      controls taking any ASM for a non-G40 indication"). The **primary** control pool is
+      **4,048**, since §4.2 applies no ASM exclusion under the primary definition.
 - [ ] **`analysis_params.toml` is read for `[cohort]` and `[validity]` only.** `params.py`
       is the mechanism; `[cohort]` was wired up 2026-09-02 and `[validity]` on 2026-09-03
       by `wear.py`. `[light]`, `[sleep]`, `[matching]`, `[survey]` and `[multiplicity]` are

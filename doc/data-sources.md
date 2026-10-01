@@ -300,6 +300,7 @@ Written to `data/processed/`.
 
 | File | Contents |
 |---|---|
+| `eligible_{cycle}_{definition}_{rule}.csv` | **The cohort the analysis uses.** One row per eligible participant with an `epilepsy` flag, named for the case definition and the valid-day rule that produced it. Not a matched set — §8.1 matches in R |
 | `valid_recordings_{cycle}_{rule}.csv` | One row per participant: the methods.md 5.2 verdict under one valid-day rule, with a `.provenance.json` sidecar. `{rule}` is `d04h20` for the primary rule, `d03h16` for Su 2022 |
 | `cases_{cycle}_{definition}.csv` | SEQN of cases under one case definition, with a `.provenance.json` sidecar recording the drug lists used |
 | `people_with_epilepsy_{cycle}.csv` | SEQN of all identified PWE. Legacy: the drug-first `broad` definition. Kept so existing results reproduce |
@@ -335,8 +336,38 @@ Note `meets_criterion` is written as text and relies on pandas inferring a bool 
 read; an object column of `"True"`/`"False"` would make `valid_seqns` admit **everyone**
 without raising, so a test pins the round trip.
 
-Controls are frequency matched on age band, sex, race/ethnicity, season and PIR band,
-among adults (age ≥ 20) with a valid recording.
+### `eligible_{cycle}_{definition}_{rule}.csv`
+
+Produced by `scripts/build_cohort.py`, read by `matching.load_eligible_sample`. Two
+columns: `SEQN` and `epilepsy` (1 = case). The filename carries both choices that decide
+membership — the case definition (§4.1) and the valid-day rule (§5.2) — so a cohort built
+under different choices cannot overwrite another.
+
+As of 2026-10-01, at `d04h20`:
+
+| cycle | definition | eligible | cases | controls |
+|---|---|---|---|---|
+| H | **primary** | 4,085 | **37** | 4,048 |
+| H | narrow | 4,085 | 22 | 4,063 |
+| H | broad | 4,085 | 97 | 3,988 |
+| G | broad | 4,032 | 81 | 3,951 |
+| G | `narrow_nocode` | 4,032 | 32 | 4,000 |
+
+The eligible pool is identical across definitions within a cycle, because eligibility is
+decided by age and accelerometry validity, not by case status. Under the primary
+definition **no ASM exclusion is applied to controls** (§4.2), so a participant taking
+topiramate for migraine is an eligible control; excluding them is a pre-specified
+sensitivity analysis, not the primary rule.
+
+> **Superseded.** `freq_match_{pwe,control}_{cycle}.csv` are the February 2026 frequency
+> matched cohort, on the legacy drug-first definition and the `PAXLDAY == '9'` validity
+> rule. Retained because seven notebooks and scripts read them and everything in
+> `results/` came from them. `scripts/build_cohort.py --definition legacy --validity
+> legacy --frequency-match` reproduces them exactly — verified 2026-10-01 at 110 cases
+> and 393 controls in cycle H, 82 and 276 in cycle G.
+
+Controls in those superseded files are frequency matched on age band, sex, race/ethnicity,
+season and PIR band, among adults (age ≥ 20) with a valid recording.
 
 ## Analysis output
 

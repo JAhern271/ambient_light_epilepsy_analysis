@@ -12,7 +12,9 @@ Inclusion criteria, applied in this order:
   1. age >= 20
   2. a valid accelerometer recording per methods.md 5.2, decided by
      `wear.valid_recordings` and passed in as `valid_seqns`
-  3. complete data on every matching variable
+  3. identified as a case under an explicitly named case definition, or not
+  4. complete data on every matching variable, for the retired frequency
+     matching only
 
 Criterion 2 used to be `PAXSTS == 1 and PAXLDAY == '9'` -- read straight off
 the PAXHD header, requiring the device to have been worn to the ninth day.
@@ -49,6 +51,11 @@ MATCH_COLS = [
 
 MIN_AGE = 20
 DEFAULT_CONTROL_RATIO = 4
+
+# Case definition naming the superseded drug-first list in
+# people_with_epilepsy_{cycle}.csv. Retained so the existing cohort files
+# and everything in results/ stay reproducible; it is not a study definition.
+LEGACY_DEFINITION = "legacy"
 DEFAULT_SEED = 42
 
 
@@ -71,7 +78,7 @@ def bin_age(ages):
     return pd.cut(ages, bins=bins, labels=labels, right=False)
 
 
-def eligible_participants(year, valid_seqns, base_path=None, definition=None):
+def eligible_participants(year, valid_seqns, definition, base_path=None):
     """
     Apply the inclusion criteria and label the demographics.
 
@@ -83,40 +90,122 @@ def eligible_participants(year, valid_seqns, base_path=None, definition=None):
         ``wear.header_only_validity(...)`` to reproduce the superseded
         PAXLDAY == '9' cohort.
 
-        It is an argument rather than a rule computed here for two reasons.
-        Deciding it needs the 88-million-row PAXMIN table, which no caller
-        should trigger by accident; and it depends on `min_valid_days` and
-        `min_wear_hours`, which are not settled (see
-        doc/implementation-status.md), so a default here would silently commit
-        the study to values the researcher has reserved.
-    definition : str, optional
-        Case definition to read, one of ``cohort.DEFINITIONS``. Omitted, the
-        legacy ``people_with_epilepsy_{cycle}.csv`` is used, which holds the
-        drug-first 'broad' definition — kept as the default only so the
-        existing cohort files and results stay reproducible. Pass 'primary'
-        for the specification's case definition (cycle H).
+        It is an argument rather than a rule computed here because deciding it
+        needs the 88-million-row PAXMIN table, which no caller should trigger
+        by accident, and because it depends on two thresholds that name a
+        specific study population.
+    definition : str
+        Case definition. **Required**, one of ``cohort.DEFINITIONS`` --
+        'primary', 'narrow', 'broad', 'narrow_nocode' -- or ``LEGACY_DEFINITION``
+        for the superseded drug-first list in
+        ``people_with_epilepsy_{cycle}.csv``.
+
+        Required for the same reason `valid_seqns` is: the definitions select
+        different study populations, and the legacy one has a positive
+        predictive value of 38.9% against the G40 requirement (methods.md 4.1).
+        It used to default to the legacy list, so a caller that said nothing
+        got the broad definition without being told.
 
     Returns
     -------
     df_all : DataFrame
-        Every adult with a valid recording — the pool controls are drawn from.
+        Every adult with a valid recording -- the pool controls are drawn from.
     df_pwe : DataFrame
         Those of them identified as having epilepsy.
     """
+    if definition == LEGACY_DEFINITION:
+        pwe_index = pd.Index(ch.load_pwe_seqn(year, base_path).values.reshape(-1))
+    elif definition in ch.DEFINITIONS:
+        pwe_index = ch.load_cases(year, definition, base_path)
+    else:
+        raise ValueError(
+            f"Unknown case definition {definition!r}. Expected one of "
+            f"{sorted(ch.DEFINITIONS)} or {LEGACY_DEFINITION!r}."
+        )
+
     demo = nhn.load_partial_demo(year, base_path)
     adults = demo[demo["age"] >= MIN_AGE]
-
-    if definition is None:
-        pwe_index = pd.Index(ch.load_pwe_seqn(year, base_path).values.reshape(-1))
-    else:
-        pwe_index = ch.load_cases(year, definition, base_path)
 
     valid = pd.Index(valid_seqns)
 
     df_all = nhn.add_demo_labels(adults.loc[adults.index.intersection(valid)])
-    df_pwe = nhn.add_demo_labels(adults.loc[adults.index.intersection(pwe_index).intersection(valid)])
+    df_pwe = nhn.add_demo_labels(
+        adults.loc[adults.index.intersection(pwe_index).intersection(valid)]
+    )
 
     return df_all, df_pwe
+
+
+def eligible_filename(cycle, definition, rule):
+    """
+    Name of the file holding one eligible analytic sample.
+
+    The name carries both choices that decide who is in it: the case
+    definition and the valid-day rule. Following the same reasoning as
+    `wear.validity_filename`, a cohort built under different choices cannot
+    overwrite another, and the filename cannot disagree with its contents.
+
+        eligible_filename("H", "primary", "d04h20")
+            eligible_H_primary_d04h20.csv
+    """
+    return f"eligible_{cycle}_{definition}_{rule}.csv"
+
+
+def save_eligible_sample(df_all, df_pwe, year, definition, rule,
+                         base_path=None, overwrite=False):
+    """
+    Write the eligible analytic sample: one row per participant, with case status.
+
+    This is the cohort the analysis uses. It is **not** a matched set --
+    methods.md 8.1 matches on the propensity score in R (`MatchIt`,
+    `method="full"`), and 9 puts the whole statistical layer there, so Python's
+    job is to say who is eligible and which of them are cases. Frequency
+    matching is retired and retained only to explain the existing results.
+
+    Refuses to replace an existing file unless `overwrite` is set, for the same
+    reason `wear.save_validity` does: this file defines the study population.
+    """
+    save_dir = paths.processed_dir(year, base_path, create=True)
+    path = save_dir / eligible_filename(year, definition, rule)
+
+    if path.exists() and not overwrite:
+        raise FileExistsError(
+            f"{path} already exists. This file defines the study population, "
+            "so it is not replaced silently. Pass overwrite=True to replace it "
+            "deliberately; a different definition or validity rule writes to a "
+            "different filename and needs no overwrite."
+        )
+
+    sample = pd.DataFrame(
+        {"epilepsy": df_all.index.isin(df_pwe.index).astype(int)},
+        index=df_all.index,
+    )
+    sample.index.name = "SEQN"
+    sample.sort_index().to_csv(path)
+
+    return path
+
+
+def load_eligible_sample(cycle, definition, rule, base_path=None):
+    """
+    Read an eligible analytic sample back, indexed by SEQN.
+
+    The caller names the definition and the validity rule, so a downstream
+    result always records which study population it was computed on.
+    """
+    name = eligible_filename(cycle, definition, rule)
+
+    try:
+        path = paths.processed_file(name, cycle, base_path)
+    except FileNotFoundError as missing:
+        raise FileNotFoundError(
+            f"No eligible sample {name}. Build it with\n"
+            f"    python scripts/build_cohort.py --cohort {cycle} "
+            f"--definition {definition} --validity spec "
+            "--min-valid-days D --min-wear-hours H"
+        ) from missing
+
+    return pd.read_csv(path, index_col="SEQN")
 
 
 def find_frequency_matched_controls(df_all, df_pwe,
