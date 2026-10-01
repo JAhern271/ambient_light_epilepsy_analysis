@@ -23,6 +23,86 @@ Template:
 
 ---
 
+## 2026-10-01 — M10/L5 clock times: starts, in circular minutes past midnight
+
+**Ran:** `pytest tests` (195 pass, including the real-data regression test). This PC,
+W: drive data, six cycle G PAXLUX participants. `tests/regenerate_regression_fixture.py`.
+`results/` untouched.
+
+**Decisions: the researcher's.**
+1. **Start, not midpoint.** §6.5 and §8.2 name M10 and L5 start times; the code computed
+   midpoints. Options as presented: because the window lengths are fixed, one is the other
+   rotated by a constant (2 h 30 for L5, 5 h for M10). So circular means, dispersion and
+   Watson–Williams results are identical either way. What differs: start matches nparACT
+   (the §9 validation comparator) and Tang 2024's M10-start quartiles. M10 *midpoints*
+   cluster around 13:00, exactly where a noon anchor would wrap. And midpoint would have
+   required amending the spec. Start chosen, as the spec already says.
+2. **Boundary representation: minutes past midnight, 0–1439, documented as circular.**
+   Options presented were minutes past midnight, hours since noon (§8.2's alternative:
+   linear-safe for L5 but not for M10 near noon), an angle in radians, and cos/sin
+   components (the only representation whose arithmetic mean is correct). Columns are
+   `m10_start_clock_min` and `l5_start_clock_min`. Nothing in the value prevents a plain
+   mean; the column name, the docstring, data-sources.md and a new sentence in §8.2 carry
+   the warning.
+3. **Scope: fix the silent-misalignment bugs only.** The tie-break and masked-bin
+   behaviours, and valid-day restriction, are new items in implementation-status.md.
+
+**Problems found in `relative_amplitude` on minute data.**
+- The epoch was read from the first two rows, so one missing minute at the start made a
+  2-minute epoch and halved every window. *Fixed:* now the most common gap; an epoch that
+  does not divide an hour raises.
+- The 24 h profile was indexed by position among the clock times present, so a clock
+  minute absent on every day moved every later time one epoch early. *Fixed:* explicit
+  clock grid, reindexed so an absent bin is NaN in place.
+- Ties go to the first window after 00:00, so a tied run across midnight starts at 00:00.
+  *Open.*
+- A clock time masked on every day makes every window containing it ineligible, without
+  warning. *Open.*
+- All rows are used, valid day or not. *Open.*
+- Wrapping past midnight with a single clear minimum was already correct.
+
+**Fixtures, agreed with the researcher before implementation.** 1-minute epochs, 7 days.
+Clock fixture A: 1000 lux 08:00–18:00, 0 lux 22:30–03:30, 100 otherwise; by hand M10 = 1000
+starting 480, L5 = 0 starting 1350, RA = 1. B (0 lux 22:00–06:00): L5 start 0, pinned as
+current behaviour. C1 (one day masked 00:00–01:00): unchanged. C2 (12:00–12:59 masked
+every day): M10 = 545 starting 780, by hand, pinned as current behaviour. D (second row
+deleted) and D2 (05:00 absent every day): unchanged from A. E: L5 starts at 23:00 and 01:00
+give 1380 and 60, arithmetic mean 720, circular mean 0.
+
+**Equivalence.** Step 1: with only the epoch and grid fix, still returning midpoints, the
+regression test passed on all 12 columns. Step 2: after the switch, HEAD's module and the
+new one run in the same process give `==` equality on the other 10 columns for all six
+participants. So does the old fixture, once read with `float_precision="round_trip"`; a
+first comparison without that flag showed spurious mismatches from pandas' default CSV
+float parser. The regenerated CSV's text is identical outside the two clock columns.
+
+**Values that moved (second route: old midpoint − 300 or − 150, mod 1440, matched exactly).**
+
+| SEQN | m10 midpoint → start | l5 midpoint → start |
+|---|---|---|
+| 62218 | 790 → 490 | 235 → 85 |
+| 62282 | 760 → 460 | 150 → 0 |
+| 62293 | 965 → 665 | 1420 → 1270 |
+| 67368 | 760 → 460 | 150 → 0 |
+| 65027 | 830 → 530 | 245 → 95 |
+| 65217 | 805 → 505 | 280 → 130 |
+
+62293's L5 now starts at 21:10 and the others' start between 00:00 and 02:10: the
+wraparound §8.2 is about, inside a six-row fixture. Two participants start at exactly
+00:00. Their L5 values are not exactly 0, so this is not shown to be the tie-break
+artefact, but it is consistent with near-ties resolving that way.
+
+**Deliberate faults**, each injected and reverted by script, source restored byte-identical:
+start off by one (9 tests fail, including the regression test); window end reported as
+start (11 fail); epoch from the first two rows (2 fail); profile without the clock-grid
+reindex (1 fails, D2). The ±10-minute sinusoid tests do not catch the off-by-one; the
+exact minute fixtures do.
+
+**Next:** the tie-break and masked-bin decisions before rest–activity metrics run on
+PAXMIN. The participant-level runner must pass valid-day minutes only.
+
+---
+
 ## 2026-10-01 — Masked daytime minutes counted raw, not rescaled
 
 **Ran:** `pytest tests`. No data run. `results/` untouched.

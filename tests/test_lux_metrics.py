@@ -420,51 +420,252 @@ def test_constant_recording_has_zero_relative_amplitude():
     assert ra == pytest.approx(0.0)
 
 
-def test_m10_midpoint_falls_at_the_peak(sinusoid_recording):
+# The clock-time outputs of relative_amplitude are the START of each window,
+# in minutes past midnight (methods.md 6.5, 8.2). The value is circular: 1439
+# and 0 are one minute apart. Positions in the returned 7-tuple:
+M10_START = 3
+L5_START = 5
+
+
+def test_m10_start_is_five_hours_before_the_peak(sinusoid_recording):
     """
-    A sinusoid peaking at midday puts the brightest 10 h window around 12:00,
-    i.e. 720 minutes after midnight, to within one epoch.
+    A sinusoid peaking at midday puts the brightest 10 h window at 07:00-17:00,
+    so it starts 420 minutes after midnight, to within one epoch.
     """
-    *_, m10_midpoint_minutes, _, _, _ = lm.relative_amplitude(sinusoid_recording)
+    m10_start = lm.relative_amplitude(sinusoid_recording)[M10_START]
 
-    assert m10_midpoint_minutes == pytest.approx(720.0, abs=10.0)
-
-
-def test_l5_midpoint_falls_at_the_trough(sinusoid_recording):
-    """The same sinusoid troughs at midnight, so the L5 midpoint is near 00:00."""
-    *_, l5_midpoint_minutes, _ = lm.relative_amplitude(sinusoid_recording)
-
-    assert l5_midpoint_minutes == pytest.approx(0.0, abs=10.0)
+    assert m10_start == pytest.approx(420.0, abs=10.0)
 
 
-def test_m10_midpoint_tracks_a_shifted_peak(sinusoid_recording):
-    """Shifting the whole profile 3 h later must shift the M10 midpoint with it."""
+def test_l5_start_is_before_midnight_for_a_trough_at_midnight(sinusoid_recording):
+    """
+    The same sinusoid troughs at midnight, so the darkest 5 h window is
+    21:30-02:30 and starts at 1290 minutes: the late end of the scale, for a
+    window centred on its early end. That is why the value is circular.
+    """
+    l5_start = lm.relative_amplitude(sinusoid_recording)[L5_START]
+
+    assert l5_start == pytest.approx(1290.0, abs=10.0)
+
+
+def test_m10_start_tracks_a_shifted_peak(sinusoid_recording):
+    """Shifting the whole profile 3 h later must shift the M10 start with it."""
     values = sinusoid_recording["mean_lux"].to_numpy()
     shifted = make_recording(np.roll(values, 3 * 12))  # 3 h at 5 min epochs
 
-    baseline_mid = lm.relative_amplitude(sinusoid_recording)[3]
-    shifted_mid = lm.relative_amplitude(shifted)[3]
+    baseline_start = lm.relative_amplitude(sinusoid_recording)[M10_START]
+    shifted_start = lm.relative_amplitude(shifted)[M10_START]
 
-    assert shifted_mid - baseline_mid == pytest.approx(180.0, abs=10.0)
+    assert shifted_start - baseline_start == pytest.approx(180.0, abs=10.0)
 
 
-def test_m10_midpoint_on_a_plateau_picks_the_earliest_window():
+def test_m10_start_on_a_plateau_picks_the_earliest_window():
     """
     Documents a tie-breaking behaviour rather than asserting correctness.
 
     A square wave with 12 h of light contains many 10 h windows of identical
     mean, so the M10 position is genuinely ambiguous. idxmax returns the first,
-    which puts the window at light onset and the midpoint at 11:00 rather than
-    the centre of the light period at 12:00.
+    which starts the window at light onset, 06:00, rather than centring it in
+    the light period (a 07:00 start).
 
     Real recordings rarely tie exactly, so this mostly matters when
-    interpreting synthetic or heavily rounded data.
+    interpreting synthetic or heavily rounded data -- and lux at night, which
+    is often exactly 0 (see the midnight tie test below).
     """
     df = square_wave(days=7, on_hour=6, off_hour=18)
 
-    m10_midpoint_minutes = lm.relative_amplitude(df)[3]
+    m10_start = lm.relative_amplitude(df)[M10_START]
 
-    assert m10_midpoint_minutes == pytest.approx(660.0)  # 11:00, not 12:00
+    assert m10_start == pytest.approx(360.0)  # 06:00
+
+
+# ---------------------------------------------------------------------------
+# M10 and L5 start times on minute-level data
+# ---------------------------------------------------------------------------
+#
+# Shaped like PAXMIN after wear.prepare_minutes: one row per minute, NaN
+# where a minute is masked. Each fixture repeats one day's profile, written
+# as (start minute, end minute, lux) blocks on a base of 100 lux.
+
+def minute_profile(blocks, base=100.0):
+    """
+    One day of minute values. Each block is (start, end, lux) in minutes past
+    midnight, end exclusive; a block whose start is later than its end wraps
+    midnight.
+    """
+    day = np.full(1440, base)
+    for start, end, lux in blocks:
+        if start < end:
+            day[start:end] = lux
+        else:
+            day[start:] = lux
+            day[:end] = lux
+    return day
+
+
+# Clock fixture A: 1000 lux 08:00-18:00, 0 lux 22:30-03:30, 100 lux otherwise.
+# Exactly one 10 h window is all 1000 and exactly one 5 h window is all 0, so
+# by hand: M10 = 1000 starting 08:00 (480), L5 = 0 starting 22:30 (1350),
+# RA = 1. The L5 window straddles midnight.
+CLOCK_FIXTURE_A = minute_profile([
+    (hhmm(8), hhmm(18), 1000.0),
+    (hhmm(22, 30), hhmm(3, 30), 0.0),
+])
+
+
+def clock_fixture_a_recording(days=7):
+    return make_recording(np.tile(CLOCK_FIXTURE_A, days), epoch_minutes=1)
+
+
+def test_l5_straddling_midnight_starts_before_midnight():
+    """Clock fixture A, every output checked against the hand-derived values."""
+    m10, l5, ra, m10_start, m10_time, l5_start, l5_time = lm.relative_amplitude(
+        clock_fixture_a_recording()
+    )
+
+    assert m10 == pytest.approx(1000.0)
+    assert l5 == pytest.approx(0.0)
+    assert ra == pytest.approx(1.0)
+    assert m10_start == 480.0
+    assert l5_start == 1350.0
+    assert str(m10_time) == "08:00:00"
+    assert str(l5_time) == "22:30:00"
+
+
+def test_l5_tie_across_midnight_resolves_to_the_first_window_after_midnight():
+    """
+    Clock fixture B. Documents current behaviour rather than asserting correctness;
+    see the tie-break item in doc/implementation-status.md.
+
+    0 lux 22:00-06:00 holds every 5 h window starting 22:00-01:00, all tied at
+    L5 = 0. The profile is scanned from 00:00, so the tie goes to the window
+    starting at 00:00 -- not to the start of the dark period (22:00), nor to
+    the window centred in it (23:30).
+    """
+    day = minute_profile([
+        (hhmm(8), hhmm(18), 1000.0),
+        (hhmm(22), hhmm(6), 0.0),
+    ])
+    df = make_recording(np.tile(day, 7), epoch_minutes=1)
+
+    result = lm.relative_amplitude(df)
+
+    assert result[1] == pytest.approx(0.0)
+    assert result[L5_START] == 0.0  # 00:00
+
+
+def test_a_minute_masked_on_one_day_does_not_move_the_windows():
+    """
+    Clock fixture C1. NaN on day 3 from 00:00 to 01:00: the profile at those minutes
+    is the mean of the other six days, still 0, so nothing changes.
+    """
+    values = np.tile(CLOCK_FIXTURE_A, 7)
+    day3 = 2 * 1440
+    values[day3:day3 + 60] = np.nan
+    df = make_recording(values, epoch_minutes=1)
+
+    result = lm.relative_amplitude(df)
+
+    assert result[0] == pytest.approx(1000.0)
+    assert result[1] == pytest.approx(0.0)
+    assert result[M10_START] == 480.0
+    assert result[L5_START] == 1350.0
+
+
+def test_a_minute_masked_on_every_day_excludes_windows_containing_it():
+    """
+    Clock fixture C2. Documents current behaviour rather than asserting correctness;
+    see the masked-bin item in doc/implementation-status.md.
+
+    NaN 12:00-12:59 on every day leaves those profile minutes NaN, and no
+    window containing one is eligible. The 08:00-18:00 window is lost, and
+    the best remaining 10 h window is 13:00-23:00, by hand:
+        5 h at 1000 + 4.5 h at 100 + 0.5 h at 0 = 5450 lux-hours / 10 = 545
+    against 445 for the best window ending by 12:00 (02:00-12:00).
+    """
+    values = np.tile(CLOCK_FIXTURE_A, 7)
+    for day in range(7):
+        noon = day * 1440 + hhmm(12)
+        values[noon:noon + 60] = np.nan
+    df = make_recording(values, epoch_minutes=1)
+
+    result = lm.relative_amplitude(df)
+
+    assert result[0] == pytest.approx(545.0)
+    assert result[M10_START] == 780.0  # 13:00
+    assert result[L5_START] == 1350.0  # L5 does not touch noon
+
+
+def test_sampling_interval_survives_a_missing_second_row():
+    """
+    Clock fixture D. Clock fixture A with its second row deleted. The interval between the
+    first two rows is then 2 minutes, but the recording is minute-level, so
+    the answers must be clock fixture A's.
+    """
+    df = clock_fixture_a_recording().drop(index=1).reset_index(drop=True)
+
+    assert lm.get_sampling_interval_minutes(df) == 1.0
+
+    result = lm.relative_amplitude(df)
+
+    assert result[0] == pytest.approx(1000.0)
+    assert result[M10_START] == 480.0
+    assert result[L5_START] == 1350.0
+
+
+def test_a_clock_minute_absent_on_every_day_does_not_shift_later_times():
+    """
+    Clock fixture D2. Clock fixture A with the 05:00 row removed from every day, so the
+    24 h profile has no entry at all for that minute. Neither window contains
+    05:00, so the answers must still be clock fixture A's. A profile indexed by
+    position would put every clock time after 05:00 one minute early.
+    """
+    df = clock_fixture_a_recording()
+    at_0500 = (df["timestamp"].dt.hour == 5) & (df["timestamp"].dt.minute == 0)
+    df = df[~at_0500].reset_index(drop=True)
+
+    result = lm.relative_amplitude(df)
+
+    assert result[M10_START] == 480.0
+    assert result[L5_START] == 1350.0
+
+
+def test_sampling_interval_that_does_not_divide_an_hour_is_rejected():
+    """A 7-minute epoch has no whole number of samples per hour."""
+    df = make_recording(np.zeros(500), epoch_minutes=7)
+
+    with pytest.raises(ValueError):
+        lm.get_sampling_interval_minutes(df)
+
+
+def test_clock_start_times_are_circular_not_linear():
+    """
+    Clock fixture E. Why the start columns must be read as circular (methods.md
+    8.2), shown on two participants whose L5 starts at 23:00 and at 01:00.
+
+    They come out as 1380 and 60 minutes past midnight. Their arithmetic mean
+    is 720 -- noon, the opposite of the truth. The circular mean, the direction
+    of the mean of their unit vectors, is midnight. The analysis does circular
+    statistics in R; this test only pins what the column means.
+    """
+    starts = []
+    for l5_from in (hhmm(23), hhmm(1)):
+        day = minute_profile([(l5_from, (l5_from + 300) % 1440, 0.0)])
+        df = make_recording(np.tile(day, 7), epoch_minutes=1)
+        starts.append(lm.relative_amplitude(df)[L5_START])
+
+    assert starts == [1380.0, 60.0]
+
+    assert np.mean(starts) == 720.0  # the error methods.md 8.2 describes
+
+    angles = np.asarray(starts) / 1440 * 2 * np.pi
+    circular_mean = np.arctan2(np.sin(angles).mean(), np.cos(angles).mean())
+    circular_mean_minutes = (circular_mean / (2 * np.pi) * 1440) % 1440
+
+    # Midnight, allowing for floating point on either side of the wrap
+    distance_from_midnight = min(circular_mean_minutes,
+                                 1440 - circular_mean_minutes)
+    assert distance_from_midnight == pytest.approx(0.0, abs=1e-9)
 
 
 # ---------------------------------------------------------------------------
@@ -551,18 +752,21 @@ def test_sampling_interval_detected_from_timestamps():
     ) == 60.0
 
 
-def test_sampling_interval_is_inferred_from_the_first_two_samples_only():
+def test_sampling_interval_ignores_a_gap_at_the_start():
     """
-    Documents a real limitation: the interval is read from the first gap, so a
-    recording that starts with a gap reports the wrong sampling rate, and every
-    metric that scales by it is then wrong.
+    A recording that starts with a gap still reports its true sampling rate.
+
+    This test used to pin the opposite, as a known limitation: the interval
+    was read from the first gap only, so this recording reported 65 minutes
+    and every metric that scales by the epoch was wrong. It is now the most
+    common gap (fixed 2026-10-01).
     """
     timestamps = list(pd.date_range("2013-06-01", periods=10, freq="5min"))
     # A one hour gap between the first and second sample
     timestamps[1:] = [t + pd.Timedelta(hours=1) for t in timestamps[1:]]
     df = pd.DataFrame({"timestamp": timestamps, "mean_lux": np.zeros(10)})
 
-    assert lm.get_sampling_interval_minutes(df) == 65.0  # not 5.0
+    assert lm.get_sampling_interval_minutes(df) == 5.0  # not 65.0
 
 
 # ---------------------------------------------------------------------------

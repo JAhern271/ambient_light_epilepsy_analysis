@@ -37,7 +37,7 @@ def test_summary_has_every_expected_column(example_data_root):
     expected = {
         "SEQN", "timezone", "duration_hours", "mean_lux", "mean_daytime_lux",
         "mean_nighttime_lux", "time_above_threshold", "M10", "L5", "RA",
-        "m10_midpoint", "l5_midpoint", "IS", "IV",
+        "m10_start_clock_min", "l5_start_clock_min", "IS", "IV",
     }
     assert expected <= set(summary.columns)
 
@@ -72,7 +72,7 @@ EXPECTED = "regression_expected.csv"
 
 METRIC_COLUMNS = [
     "duration_hours", "mean_lux", "mean_daytime_lux", "mean_nighttime_lux",
-    "time_above_threshold", "M10", "L5", "RA", "m10_midpoint", "l5_midpoint",
+    "time_above_threshold", "M10", "L5", "RA", "m10_start_clock_min", "l5_start_clock_min",
     "IS", "IV",
 ]
 
@@ -103,10 +103,20 @@ def test_metrics_match_pinned_values(request):
     actual = lm.compute_lux_summary(expected["SEQN"].to_numpy(), "G", None)
     actual = actual.set_index("SEQN").loc[expected["SEQN"]].reset_index()
 
+    # Check every column before failing, so one failure lists every column
+    # that moved rather than stopping at the first.
+    changed = []
     for column in METRIC_COLUMNS:
-        np.testing.assert_allclose(
-            actual[column].to_numpy(dtype=float),
-            expected[column].to_numpy(dtype=float),
-            rtol=1e-9,
-            err_msg=f"{column} changed",
-        )
+        try:
+            np.testing.assert_allclose(
+                actual[column].to_numpy(dtype=float),
+                expected[column].to_numpy(dtype=float),
+                rtol=1e-9,
+            )
+        except AssertionError as error:
+            changed.append(f"{column}:\n{error}")
+
+    assert not changed, (
+        f"{len(changed)} of {len(METRIC_COLUMNS)} columns changed:\n\n"
+        + "\n\n".join(changed)
+    )

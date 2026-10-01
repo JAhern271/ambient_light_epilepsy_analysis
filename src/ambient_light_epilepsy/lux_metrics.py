@@ -96,8 +96,9 @@ def compute_lux_summary(seqn_array, year, base_path=None, downsample="5min"):
             threshold = light["primary_day_threshold"]
             mins_per_day_above = time_above_threshold_normalized(df, threshold=threshold)
     
-            # Calculate m10, l5, theri midpoints and the relative amplitude
-            m10, l5, ra, m10_midpoint_minutes, m10_midpoint_time, l5_midpoint_minutes, l5_midpoint_time = relative_amplitude(df)
+            # Calculate m10, l5, the relative amplitude, and the clock times
+            # at which M10 and L5 start (circular minutes past midnight)
+            m10, l5, ra, m10_start_minutes, m10_start_time, l5_start_minutes, l5_start_time = relative_amplitude(df)
     
             # Calculate IS and IV
             IS = interdaily_stability(df)
@@ -114,8 +115,9 @@ def compute_lux_summary(seqn_array, year, base_path=None, downsample="5min"):
                 "M10": m10,
                 "L5": l5, 
                 "RA": ra,
-                "m10_midpoint": m10_midpoint_minutes,
-                "l5_midpoint": l5_midpoint_minutes,
+                # Circular: never average these arithmetically (methods.md 8.2)
+                "m10_start_clock_min": m10_start_minutes,
+                "l5_start_clock_min": l5_start_minutes,
                 "IS": IS,
                 "IV": IV
             })
@@ -226,9 +228,35 @@ def compute_mean_nighttime_lux(df, *, night_start, night_end):
 
 
 def get_sampling_interval_minutes(df):
-    df = df.sort_values("timestamp")
-    delta = (df["timestamp"].iloc[1] - df["timestamp"].iloc[0]).total_seconds()
-    return delta / 60
+    """
+    The recording's epoch length in minutes: 1 for PAXMIN, 5 or 1/60 for the
+    PAXLUX downsamples.
+
+    Taken as the most common gap between consecutive timestamps, so a single
+    missing or duplicated row cannot change it. (An earlier version read only
+    the first two rows, so one missing minute at the start of a PAXMIN
+    recording made it a 2-minute epoch and halved every window length.)
+
+    Raises if the epoch is not positive, or does not fit a whole number of
+    times into an hour, since the M10 and L5 windows are counted in samples.
+    """
+    timestamps = df["timestamp"].sort_values()
+    gaps_seconds = timestamps.diff().dropna().dt.total_seconds()
+
+    if gaps_seconds.empty:
+        raise ValueError("Need at least two timestamps to find the epoch")
+
+    # mode() returns every tied value in ascending order; take the smallest
+    epoch_seconds = float(gaps_seconds.mode().iloc[0])
+
+    if epoch_seconds <= 0:
+        raise ValueError(f"Most common gap between timestamps is {epoch_seconds} s")
+    if 3600 % epoch_seconds != 0:
+        raise ValueError(
+            f"Epoch of {epoch_seconds} s does not divide an hour evenly"
+        )
+
+    return epoch_seconds / 60
 
 
 
@@ -343,85 +371,123 @@ def minutes_above_thresholds(prepared, days, *, thresholds, day_window,
 
 
 
+def window_start(window_end_index, window_samples, samples_per_day, epoch_minutes):
+    """
+    Clock time at which a rolling window starts, from the index of its last
+    sample in the two-day extended profile used by relative_amplitude.
+
+    Returns (minutes past midnight, datetime.time). The minutes are circular,
+    0-1439: a window starting at 23:30 is 1410, one starting at 00:30 is 30,
+    and the two are an hour apart, not 23 hours.
+    """
+    start_index = window_end_index - window_samples + 1
+
+    # A window can start late on the first copy of the day and run into the
+    # second; taking the index modulo one day returns its clock position.
+    start_minutes = (start_index % samples_per_day) * epoch_minutes
+
+    start_time = (pd.Timestamp("2000-01-01") + pd.Timedelta(minutes=start_minutes)).time()
+
+    return start_minutes, start_time
+
+
 def relative_amplitude(df):
+    """
+    M10, L5, relative amplitude, and the clock times at which M10 and L5 start
+    (methods.md 6.5).
+
+    The recording is averaged into one 24 h profile (each clock time's mean
+    across days). M10 is the highest mean over any 10 h stretch of that
+    profile and L5 the lowest over any 5 h stretch, with windows allowed to
+    run across midnight. RA = (M10 - L5) / (M10 + L5).
+
+    The start times are minutes past midnight, 0-1439, and they are CIRCULAR
+    (methods.md 8.2). L5 typically starts either side of midnight, so two
+    participants at 23:00 and 01:00 come out as 1380 and 60, whose arithmetic
+    mean is noon. Never average, difference or regress these values as plain
+    numbers; read them in R as circular, e.g.
+        circular(x / 60, units = "hours", template = "clock24")
+    Starts, not midpoints, because methods.md 6.5 and 8.2 name start times,
+    as do nparACT and [Tang_2024] (decided 2026-10-01).
+
+    Known behaviours, each an open item in doc/implementation-status.md rather
+    than a settled definition:
+      - Ties go to the first window found scanning from 00:00, so a tied
+        stretch that crosses midnight starts at 00:00, not at its own start.
+        Common for L5 on lux, where a dark room reads exactly 0.
+      - A clock time that is masked (NaN) on every day leaves that profile
+        point NaN, and no window containing it is eligible.
+      - Every row passed in is used, valid day or not; restricting to valid
+        days is the caller's job for now.
+
+    Parameters
+    ----------
+    df : pandas DataFrame
+        'timestamp' and 'mean_lux' (or any signal under that name), NaN where
+        a sample is masked.
+
+    Returns
+    -------
+    tuple
+        (m10, l5, ra, m10_start_minutes, m10_start_time,
+         l5_start_minutes, l5_start_time)
+    """
 
     df = df.copy()
     df = df.sort_values("timestamp")
-    
+
     epoch_minutes = get_sampling_interval_minutes(df)
-    
-    # Average 24h profile
-    df["time_of_day"] = df["timestamp"].dt.time
-    mean_24h = df.groupby("time_of_day")["mean_lux"].mean()
-    
+    samples_per_day = int(round(24 * 60 / epoch_minutes))
+
+    # Average 24 h profile, on an explicit clock grid: bin 0 is the epoch
+    # starting at 00:00, bin 1 the next, and so on. Every bin is present even
+    # if no row falls in it (it is then NaN), so a bin's position in `values`
+    # is always its clock time. Grouping on the clock times that happen to be
+    # present, as an earlier version did, shifts every later time earlier by
+    # one epoch for each bin that is absent.
+    seconds_into_day = (
+        df["timestamp"].dt.hour * 3600
+        + df["timestamp"].dt.minute * 60
+        + df["timestamp"].dt.second
+    )
+    df["clock_bin"] = (seconds_into_day // (epoch_minutes * 60)).astype(int)
+    mean_24h = df.groupby("clock_bin")["mean_lux"].mean()
+    mean_24h = mean_24h.reindex(range(samples_per_day))
+
     values = mean_24h.values
-    
-    samples_per_hour = int(60 / epoch_minutes)
+
+    samples_per_hour = int(round(60 / epoch_minutes))
     m10_window = 10 * samples_per_hour
     l5_window = 5 * samples_per_hour
-    
-    # Circular extension
+
+    # Two copies of the day end to end, so that a window can run across
+    # midnight. Each rolling mean is labelled by the window's LAST sample.
     extended = np.concatenate([values, values])
-    
-    # Rolling means
+
     m10_roll = pd.Series(extended).rolling(m10_window).mean()
     l5_roll = pd.Series(extended).rolling(l5_window).mean()
-    
+
     m10 = m10_roll.max()
     l5 = l5_roll.min()
-    
+
     ra = (m10 - l5) / (m10 + l5)
-    
-    minutes_per_sample = epoch_minutes
-    
-    # =========================
-    # M10 midpoint
-    # =========================
-    
-    m10_idx = m10_roll.idxmax()
-    
-    m10_start = m10_idx - m10_window + 1
-    m10_midpoint_idx = m10_start + m10_window // 2
-    
-    m10_midpoint_idx = m10_midpoint_idx % len(values)
-    
-    m10_midpoint_minutes = m10_midpoint_idx * minutes_per_sample
-    
-    m10_hours = int(m10_midpoint_minutes // 60)
-    m10_minutes = int(m10_midpoint_minutes % 60)
-    
-    m10_midpoint_time = pd.Timestamp(
-        f"{m10_hours:02d}:{m10_minutes:02d}"
-    ).time()
-    
-    # =========================
-    # L5 midpoint
-    # =========================
-    
-    l5_idx = l5_roll.idxmin()
-    
-    l5_start = l5_idx - l5_window + 1
-    l5_midpoint_idx = l5_start + l5_window // 2
-    
-    l5_midpoint_idx = l5_midpoint_idx % len(values)
-    
-    l5_midpoint_minutes = l5_midpoint_idx * minutes_per_sample
-    
-    l5_hours = int(l5_midpoint_minutes // 60)
-    l5_minutes = int(l5_midpoint_minutes % 60)
-    
-    l5_midpoint_time = pd.Timestamp(
-        f"{l5_hours:02d}:{l5_minutes:02d}"
-    ).time()
-    
+
+    # idxmax / idxmin return the first window on a tie (see docstring)
+    m10_start_minutes, m10_start_time = window_start(
+        m10_roll.idxmax(), m10_window, samples_per_day, epoch_minutes
+    )
+    l5_start_minutes, l5_start_time = window_start(
+        l5_roll.idxmin(), l5_window, samples_per_day, epoch_minutes
+    )
+
     return (
         m10,
         l5,
         ra,
-        m10_midpoint_minutes,
-        m10_midpoint_time,
-        l5_midpoint_minutes,
-        l5_midpoint_time
+        m10_start_minutes,
+        m10_start_time,
+        l5_start_minutes,
+        l5_start_time
     )
 
 

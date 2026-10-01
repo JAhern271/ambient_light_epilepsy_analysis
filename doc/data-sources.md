@@ -275,8 +275,8 @@ Computed per participant by `lux_metrics.compute_lux_summary`.
 | `M10` | Highest 10-hour rolling mean of the average 24 h profile |
 | `L5` | Lowest 5-hour rolling mean of the average 24 h profile |
 | `RA` | Relative amplitude, `(M10 - L5) / (M10 + L5)` |
-| `m10_midpoint` | Midpoint of the M10 window, minutes from midnight |
-| `l5_midpoint` | Midpoint of the L5 window, minutes from midnight |
+| `m10_start_clock_min` | Start of the M10 window, minutes past midnight (0–1439). **Circular**: never average arithmetically (methods §8.2) |
+| `l5_start_clock_min` | Start of the L5 window, minutes past midnight (0–1439). **Circular**; typically either side of midnight |
 | `IS` | Interdaily stability (Witting et al. 1990), computed on **hourly** bins |
 | `IV` | Intradaily variability, from successive-difference variance at the native epoch |
 

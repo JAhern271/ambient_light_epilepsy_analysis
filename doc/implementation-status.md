@@ -79,11 +79,41 @@ Ordered by how much damage they do if left.
       confirmed figures are 70/54/44. Corrected in the spec, logged, and pinned by a
       test. Two open consequences below: the cases are not yet wired into matching, and
       `analysis_params.toml` is still unread outside `[cohort]`.
-- [ ] **Clock times are stored as linear minutes from midnight.** `m10_midpoint` and
-      `l5_midpoint` in `lux_metrics.py`. Any group comparison of `l5_midpoint` reproduces
-      the exact error the spec (§8.2) criticises in Tang 2024 and Bailey 2023, because L5
-      straddles the wraparound. **The affected values are already in `results/`.** Fix the
-      metric, then handle group comparison with circular statistics.
+- [x] **Clock times are stored as linear minutes from midnight.** Done 2026-10-01.
+      `relative_amplitude` now returns the M10 and L5 **start** times that §6.5 and §8.2
+      specify, not midpoints. `compute_lux_summary` emits them as `m10_start_clock_min`
+      and `l5_start_clock_min`: minutes past midnight, documented as circular in the
+      docstring, in data-sources.md and in §8.2, for R to read with `circular`. Both
+      choices were the researcher's. Two silent-misalignment bugs fixed in the same
+      function: the epoch is now the most common timestamp gap rather than the first, and
+      the 24 h profile sits on an explicit clock grid, so a missing bin can no longer
+      shift later times. Regression fixture regenerated: the other 10 columns are
+      bit-identical, and the new starts equal the old midpoints minus half a window
+      (mod 1440) for all six participants. Group comparison stays in R (§9). The values
+      in `results/` are still midpoints and still superseded. See the 2026-10-01 entry
+      in [analysis-log.md](analysis-log.md).
+      - [ ] **M10/L5 tie-break across midnight.** A tie goes to the first window found
+            scanning from 00:00, so a 0-lux stretch from 22:00 to 06:00 gives an L5 start
+            of 00:00, not 22:00 (start of the stretch) or 23:30 (centred in it). Common
+            on lux, where a dark room reads exactly 0; rare on activity. Options: first
+            window in the tied stretch, centre of the stretch, or report timing as
+            undefined when tied. Pinned as current behaviour by
+            `test_l5_tie_across_midnight_resolves_to_the_first_window_after_midnight`.
+            Researcher's decision.
+      - [ ] **A clock time masked on every day takes every window containing it out
+            of contention.** Its profile point is NaN, the rolling mean is NaN for every
+            window containing it, and those windows are skipped without warning. Someone who
+            removes the device at the same time every night can pass the 20 h rule and
+            still have L5 pushed out of the night. Options: keep that behaviour, average
+            over the window's non-NaN minutes subject to a minimum coverage, or NaN for
+            the participant. Pinned as current behaviour by
+            `test_a_minute_masked_on_every_day_excludes_windows_containing_it`.
+            Researcher's decision; needed before rest–activity metrics run on PAXMIN.
+      - [ ] **`relative_amplitude` (and IS/IV) use every row, not valid days only.** The
+            threshold metric restricts to valid days; the nonparametric metrics do not.
+            The participant-level runner should pass only valid-day minutes, or the
+            functions should take the `wear.summarise_days` table as
+            `minutes_above_thresholds` does.
 - [x] **Night window disagrees with the spec.** Done 2026-10-01. `compute_lux_summary`
       reads `light.day_window` and `light.night_window`; the `7, 19` and `20, 5` literals
       and both function defaults (including the third value, 22:00–05:00) are gone, so
