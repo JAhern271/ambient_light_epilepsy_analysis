@@ -218,8 +218,24 @@ Ordered by how much damage they do if left.
       recovery this item assumed: it also excludes participants with nine days of
       recording but too little wear, which the header rule could not see. Both directions
       to be measured once D and H are set — see above.
-- [ ] **Light thresholds at 100 and 250 lux.** `time_above_threshold_normalized` already
-      takes a `threshold` argument; only the call site is hard-coded to 1,000.
+- [x] **Light thresholds at 100, 250 and 1,000 lux.** Done 2026-10-01, and it was not
+      only the call site: the old function counted all 24 h rather than the day window,
+      had no notion of valid days, and divided by every row, so on PAXMIN a masked minute
+      would have counted as "not above". New `lux_metrics.minutes_above_thresholds` takes
+      the `wear.prepare_minutes` frame and the `wear.summarise_days` table, counts retained
+      day-window minutes strictly above each `light.day_thresholds` value per **valid**
+      day, and averages across valid days. The superseded function survives for the frozen
+      PAXLUX route, now reading `light.primary_day_threshold` (same value; fixture
+      unchanged). Nothing yet calls the new function on real data — that waits for the
+      participant-level runner and for the item below.
+      - [ ] **Masked minutes inside the day window: raw count or rescaled?** Open,
+            researcher's decision, deferred 2026-10-01. A valid day can have up to 4 h
+            masked. `raw` counts only retained minutes above the threshold, so less wear
+            reads as less light; `rescale` multiplies by window / retained window minutes,
+            assuming the masked minutes resembled the retained ones. Implemented as a
+            required `masked_minutes` argument with no default, both branches tested
+            (300 vs 360 on the same day), so nothing can run until this is chosen. Once
+            chosen, record it in `[light]` and the spec §6.2.
 - [ ] **Proportion of daytime minutes at the 2,500 lux ceiling** (spec §6.2, secondary).
 - [ ] **Day–night light contrast** (spec §6.2).
 - [ ] **Categorical nighttime light** — none / low / high, split at the median among the

@@ -192,6 +192,198 @@ def test_time_above_threshold_is_a_daily_rate_not_a_total():
 
 
 # ---------------------------------------------------------------------------
+# Daytime minutes above 100 / 250 / 1000 lux, per valid day (methods.md 6.2)
+# ---------------------------------------------------------------------------
+
+def analytic_days(day_specs):
+    """
+    Build a prepared-minutes frame and a days table directly, so each test
+    can say exactly which clock minutes of which analytic day carry what.
+
+    `day_specs` is a list, one entry per noon-to-noon day, of
+    (is_valid, [(clock_start, clock_end, lux), ...]) where clock times are
+    minutes past midnight and lux=None marks the minutes as masked. Anything
+    not mentioned is 0 lux and retained.
+    """
+    frames = []
+    for d, (_, segments) in enumerate(day_specs):
+        day = pd.Timestamp("2013-06-02") + pd.Timedelta(days=d)
+        timestamps = day + pd.Timedelta(hours=12) + pd.to_timedelta(np.arange(1440), "m")
+        # Clock minute of each row: noon is 720, the following 11:59 is 719
+        clock = (720 + np.arange(1440)) % 1440
+
+        lux = np.zeros(1440)
+        retained = np.ones(1440, dtype=bool)
+        for clock_start, clock_end, value in segments:
+            rows = (clock >= clock_start) & (clock < clock_end)
+            if value is None:
+                retained[rows] = False
+            else:
+                lux[rows] = value
+
+        frames.append(pd.DataFrame({
+            "timestamp": timestamps,
+            "mean_lux": np.where(retained, lux, np.nan),
+            "retained": retained,
+            "analytic_day": day,
+        }))
+
+    prepared = pd.concat(frames, ignore_index=True)
+    days = pd.DataFrame(
+        {"is_valid": [valid for valid, _ in day_specs]},
+        index=pd.Index(
+            [pd.Timestamp("2013-06-02") + pd.Timedelta(days=d)
+             for d in range(len(day_specs))],
+            name="analytic_day",
+        ),
+    )
+    return prepared, days
+
+
+def hhmm(hour, minute=0):
+    return hour * 60 + minute
+
+
+# Fixture A. Two valid days; the day window is 07:00-18:59, 720 minutes.
+#   day 1: 07:00-11:59 at 1500 (300 min), 12:00-13:59 at 500 (120),
+#          14:00-18:59 at 50 (300); plus 02:00-02:59 at 1500, outside the
+#          window, which must not count
+#   day 2: 07:00-07:59 at 2500 (60), 08:00-11:59 at 200 (240),
+#          12:00-18:59 at 50 (420)
+#   day 3: NOT valid, 2500 lux all day, which must not count
+#
+#   > 100:  (420 + 300) / 2 = 360
+#   > 250:  (420 +  60) / 2 = 240
+#   > 1000: (300 +  60) / 2 = 180
+FIXTURE_A = [
+    (True, [(hhmm(7), hhmm(12), 1500.0), (hhmm(12), hhmm(14), 500.0),
+            (hhmm(14), hhmm(19), 50.0), (hhmm(2), hhmm(3), 1500.0)]),
+    (True, [(hhmm(7), hhmm(8), 2500.0), (hhmm(8), hhmm(12), 200.0),
+            (hhmm(12), hhmm(19), 50.0)]),
+    (False, [(0, 1440, 2500.0)]),
+]
+
+THRESHOLDS = LIGHT["day_thresholds"]
+
+
+def test_day_thresholds_are_the_specified_ones():
+    """Pins [light] to methods.md 6.2: 100, 250 and 1,000 lux."""
+    assert THRESHOLDS == [100, 250, 1000]
+    assert LIGHT["primary_day_threshold"] == 1000
+
+
+@pytest.mark.parametrize("rule", lm.MASKED_MINUTE_RULES)
+def test_minutes_above_thresholds_fixture_a(rule):
+    """
+    Nothing is masked in fixture A, so both masked-minute rules must agree
+    on the hand-derived answer.
+    """
+    prepared, days = analytic_days(FIXTURE_A)
+
+    result = lm.minutes_above_thresholds(
+        prepared, days, thresholds=THRESHOLDS,
+        day_window=LIGHT["day_window"], masked_minutes=rule,
+    )
+
+    assert result == {100: pytest.approx(360.0),
+                      250: pytest.approx(240.0),
+                      1000: pytest.approx(180.0)}
+
+
+# Fixture B. One valid day: 07:00-11:59 at 1500 (300 min), 12:00-13:59
+# masked (120 min), 14:00-18:59 at 50 (300). 600 of 720 window minutes are
+# retained.
+#   raw:     300
+#   rescale: 300 * 720 / 600 = 360
+FIXTURE_B = [
+    (True, [(hhmm(7), hhmm(12), 1500.0), (hhmm(12), hhmm(14), None),
+            (hhmm(14), hhmm(19), 50.0)]),
+]
+
+
+@pytest.mark.parametrize("rule, expected", [("raw", 300.0), ("rescale", 360.0)])
+def test_masked_minutes_rule(rule, expected):
+    prepared, days = analytic_days(FIXTURE_B)
+
+    result = lm.minutes_above_thresholds(
+        prepared, days, thresholds=[1000],
+        day_window=LIGHT["day_window"], masked_minutes=rule,
+    )
+
+    assert result[1000] == pytest.approx(expected)
+
+
+def test_minutes_exactly_at_a_threshold_are_not_above_it():
+    """Strictly greater, as for the superseded function."""
+    prepared, days = analytic_days([(True, [(hhmm(7), hhmm(19), 1000.0)])])
+
+    result = lm.minutes_above_thresholds(
+        prepared, days, thresholds=[1000],
+        day_window=LIGHT["day_window"], masked_minutes="raw",
+    )
+
+    assert result[1000] == 0.0
+
+
+def test_no_valid_days_gives_nan():
+    prepared, days = analytic_days([(False, [(0, 1440, 2500.0)])])
+
+    result = lm.minutes_above_thresholds(
+        prepared, days, thresholds=THRESHOLDS,
+        day_window=LIGHT["day_window"], masked_minutes="raw",
+    )
+
+    assert all(np.isnan(value) for value in result.values())
+
+
+def test_masked_minutes_rule_has_no_default():
+    """The choice is open (implementation-status.md), so it must be stated."""
+    prepared, days = analytic_days(FIXTURE_B)
+
+    with pytest.raises(TypeError):
+        lm.minutes_above_thresholds(
+            prepared, days, thresholds=[1000], day_window=LIGHT["day_window"]
+        )
+    with pytest.raises(ValueError):
+        lm.minutes_above_thresholds(
+            prepared, days, thresholds=[1000],
+            day_window=LIGHT["day_window"], masked_minutes="impute",
+        )
+
+
+def test_minutes_above_thresholds_through_the_wear_chain():
+    """
+    Second route, from raw PAXMIN records through wear.prepare_minutes and
+    wear.summarise_days.
+
+    100 lux throughout, except 1500 lux from 07:00 to 08:59 every morning.
+    Every candidate noon-to-noon day contains exactly one such morning and is
+    fully worn, so all seven are valid and each has 120 minutes above every
+    threshold -- including above 100, since the 100 lux minutes are not
+    *above* 100.
+
+    The recording starts at 16:30, so 07:00 on calendar day k+1 (k from 0) is
+    minute 870 + 1440 k.
+    """
+    minutes = make_paxmin(first_time="16:30:00", lux=100.0)
+    for k in range(8):
+        minutes = set_minutes(minutes, 870 + 1440 * k, 120, PAXLXMM=1500.0)
+
+    prepared = wear.prepare_minutes(minutes, "16:30:00")
+    days = wear.summarise_days(prepared, min_wear_hours=20)
+    assert int(days["is_valid"].sum()) == 7
+
+    result = lm.minutes_above_thresholds(
+        prepared, days, thresholds=THRESHOLDS,
+        day_window=LIGHT["day_window"], masked_minutes="raw",
+    )
+
+    assert result == {100: pytest.approx(120.0),
+                      250: pytest.approx(120.0),
+                      1000: pytest.approx(120.0)}
+
+
+# ---------------------------------------------------------------------------
 # M10, L5 and relative amplitude
 # ---------------------------------------------------------------------------
 

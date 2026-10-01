@@ -90,8 +90,10 @@ def compute_lux_summary(seqn_array, year, base_path=None, downsample="5min"):
                 df, night_start=night_start, night_end=night_end
             )
     
-            # Calculate the time above threshold LUX level
-            threshold = 1000
+            # Calculate the time above threshold LUX level. This is the
+            # superseded whole-recording version, kept for the frozen PAXLUX
+            # route; see minutes_above_thresholds for the methods.md 6.2 one.
+            threshold = light["primary_day_threshold"]
             mins_per_day_above = time_above_threshold_normalized(df, threshold=threshold)
     
             # Calculate m10, l5, theri midpoints and the relative amplitude
@@ -230,7 +232,16 @@ def get_sampling_interval_minutes(df):
 
 
 
-def time_above_threshold_normalized(df, threshold=1000):
+def time_above_threshold_normalized(df, threshold):
+    """
+    Minutes per day above `threshold`, over the whole recording.
+
+    SUPERSEDED for the analysis; kept so the frozen PAXLUX route and its
+    regression fixture stay reproducible. It does not implement methods.md
+    6.2: it counts all 24 hours rather than the day window, has no notion of
+    valid days, and divides by every row, so a masked (NaN) minute counts as
+    "not above". Use minutes_above_thresholds on PAXMIN instead.
+    """
     df = df.copy()
     df = df.sort_values("timestamp")
     
@@ -247,6 +258,88 @@ def time_above_threshold_normalized(df, threshold=1000):
     mins_per_day_above = percent_above * 60 * 24
         
     return mins_per_day_above
+
+
+# The two ways a masked minute inside the day window can be treated. Which one
+# the analysis uses is an open decision (doc/implementation-status.md), so it
+# is a required argument with no default.
+MASKED_MINUTE_RULES = ("raw", "rescale")
+
+
+def minutes_above_thresholds(prepared, days, *, thresholds, day_window,
+                             masked_minutes):
+    """
+    Daytime minutes per day above each light threshold (methods.md 6.2).
+
+    For each VALID day, count the retained minutes inside the day window
+    whose lux is strictly above the threshold, then average across valid
+    days. Minutes outside the day window, and days that are not valid, play
+    no part.
+
+    Parameters
+    ----------
+    prepared : DataFrame
+        From wear.prepare_minutes: needs 'timestamp', 'mean_lux' (NaN where
+        masked), 'retained' and 'analytic_day'.
+    days : DataFrame
+        From wear.summarise_days, indexed by analytic_day, with 'is_valid'.
+    thresholds : sequence of numbers
+        Lux thresholds; light.day_thresholds.
+    day_window : (int, int)
+        Start and end hour; light.day_window.
+    masked_minutes : "raw" or "rescale"
+        What a masked minute inside the day window counts as.
+          raw      it is simply not counted, so a day with less wear can
+                   score lower for that reason alone.
+          rescale  the count is scaled up by (window minutes / retained
+                   window minutes), which assumes the masked minutes looked
+                   like the retained ones.
+        No default: the choice has not been made yet.
+
+    Returns
+    -------
+    dict
+        {threshold: mean minutes per valid day}. NaN for every threshold if
+        the participant has no valid day.
+    """
+    if masked_minutes not in MASKED_MINUTE_RULES:
+        raise ValueError(
+            f"masked_minutes must be one of {MASKED_MINUTE_RULES}, "
+            f"got {masked_minutes!r}"
+        )
+
+    start, end = day_window
+
+    # Length of the window in minutes: 720 for 07:00-19:00
+    window_minutes = 60 * int(in_clock_window(np.arange(24), start, end).sum())
+
+    valid_days = days.index[days["is_valid"]]
+
+    # Day-window minutes of valid days only
+    hours = prepared["timestamp"].dt.hour
+    keep = in_clock_window(hours, start, end) & prepared["analytic_day"].isin(valid_days)
+    window = prepared.loc[keep]
+
+    if len(valid_days) == 0:
+        return {threshold: np.nan for threshold in thresholds}
+
+    grouped = window.groupby("analytic_day")
+    retained_per_day = grouped["retained"].sum()
+
+    result = {}
+    for threshold in thresholds:
+        # A masked minute's lux is NaN, and NaN > threshold is False, so it is
+        # never counted as above. That is the "raw" rule.
+        above_per_day = (window["mean_lux"] > threshold).groupby(
+            window["analytic_day"]
+        ).sum()
+
+        if masked_minutes == "rescale":
+            above_per_day = above_per_day * window_minutes / retained_per_day
+
+        result[threshold] = float(above_per_day.mean())
+
+    return result
 
 
 

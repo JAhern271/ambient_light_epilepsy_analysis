@@ -23,6 +23,31 @@ Template:
 
 ---
 
+## 2026-10-01 — Daytime minutes above 100, 250 and 1,000 lux, per valid day
+
+**Ran:** `pytest tests` (186 pass, real-data regression included). No data run. `results/`
+untouched.
+
+**What changed.** New `lux_metrics.minutes_above_thresholds` implements §6.2's primary
+light metric: for each valid day, retained 07:00–18:59 minutes strictly above each of
+`light.day_thresholds`, averaged across valid days. The superseded
+`time_above_threshold_normalized` counted all 24 h, over the whole recording, with every
+row in the denominator; it is kept, documented as superseded, for the frozen PAXLUX
+route, and now reads its 1,000 lux from `light.primary_day_threshold` — the regression
+fixture is unchanged, confirming the literal removal is behaviour-neutral.
+
+**Left open, by the researcher.** How a masked minute inside the day window counts — not
+at all (`raw`), or by rescaling the day's count to the full window (`rescale`). Both are
+implemented behind a required `masked_minutes` argument with no default, so the metric
+cannot be produced on real data until the choice is made.
+
+**Tests.** Fixture A (two valid days plus an invalid one at 2,500 lux, and 1,500 lux at
+02:00 outside the window): 360 / 240 / 180 minutes at 100 / 250 / 1,000, by hand.
+Fixture B (120 of 720 window minutes masked): 300 raw, 360 rescaled. Second route through
+`wear.prepare_minutes` and `wear.summarise_days` on synthetic PAXMIN: 120 minutes at every
+threshold. Counting all 24 h instead of the window was injected as a fault and turned
+Fixture A's 1,000 lux figure into 210, exactly as predicted; three tests failed.
+
 ## 2026-10-01 — Night window set to the specified 23:00–06:00
 
 **Ran:** `pytest tests` (177 pass, including the cycle-G real-data regression test) and
