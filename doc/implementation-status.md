@@ -285,6 +285,17 @@ Tracked here because they are edits to [methods.md](methods.md) rather than to c
 - [ ] **`PAXLUX_G` documentation** was never checked against `PAXLUX_H`, particularly the
       2,500 lux ceiling that §6.2 depends on. Now lower priority — cycle G is a
       replication cohort only — but it still needs doing before the G results are reported.
+- [ ] **State the valid-day selection check in §10.** The 2026-09-03 analysis-log entry
+      tested whether the valid-day rule excludes cases differentially — it costs 7 of 44
+      primary cases, and ASM sedation or disability reducing tolerance for a wrist device
+      would make the rule select on something plausibly caused by the exposure. It found
+      no consistent evidence: cases excluded 19.6% [10.7, 33.2] against controls 15.6%
+      [14.6, 16.6] in cycle H, with cycle G running the *opposite* way (RR 0.66).
+      §10.3's "if this measurement error is non-differential by epilepsy status it biases
+      toward the null" assumes precisely what that check tested, so the result belongs
+      next to it — and it is worth stating whichever way it had come out, since a reader
+      cannot tell a check that was never run from one that found nothing. Wording is the
+      researcher's; the numbers are in the log entry.
 - [ ] **Draw the DAG** for the supplementary material (spec §12 item 9). The
       depression-as-mediator assumption in particular is arguable and should be inspectable.
 - [ ] **Pre-registration** (OSF). Tag the spec in git at the point it is frozen, so
